@@ -5,16 +5,19 @@ A drop-in solution for global (inter-app) access to `SharedPreferences`.
 
 ## Usage
 
-First, subclass `RemotePreferenceProvider` and implement the
-default constructor, which should call the super constructor
-with the appropriate `authority` and `prefNames` parameters.
-
-Example:
+First, subclass `RemotePreferenceProvider` (remember to add
+the corresponding entry in your `AndroidManifest.xml`) and
+implement the default constructor, which should call the super
+constructor with the appropriate `authority` and `prefNames`
+parameters. `authority` should have the same value as the 
+`android:authorities` attribute in `AndroidManifest.xml`, and
+`prefNames` contains the names of the preference files you wish
+to export. For example:
 
 MyPreferenceProvider.java
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
-    public PreferenceProvider() {
+    public MyPreferenceProvider() {
         super("com.example.myapp.preferences", new String[] {"main_prefs"});
     }
 }
