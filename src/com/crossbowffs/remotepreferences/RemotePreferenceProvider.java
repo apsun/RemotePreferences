@@ -113,9 +113,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         String key = prefKeyPair.mPrefKey;
         SharedPreferences preferences = getPreferences(prefKeyPair, true);
         if (key.isEmpty()) {
-            preferences.edit().clear().apply();
+            preferences.edit().clear().commit();
         } else {
-            preferences.edit().remove(key).apply();
+            preferences.edit().remove(key).commit();
         }
         return 0;
     }

@@ -37,11 +37,7 @@ import java.util.Set;
             sb.append(s.replace("\\", "\\\\").replace(";", "\\;"));
             sb.append(';');
         }
-        if (sb.length() == 0) {
-            return "";
-        } else {
-            return sb.toString();
-        }
+        return sb.toString();
     }
 
     public static Set<String> deserializeStringSet(String serializedString) {
