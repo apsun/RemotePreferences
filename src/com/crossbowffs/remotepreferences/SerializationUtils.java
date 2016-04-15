@@ -51,6 +51,8 @@ import java.util.Set;
             } else if (c == ';') {
                 stringSet.add(sb.toString());
                 sb.setLength(0);
+            } else {
+                sb.append(c);
             }
         }
         return stringSet;
