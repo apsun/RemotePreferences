@@ -80,10 +80,10 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         PrefKeyPair prefKeyPair = parseUri(uri);
         String key = prefKeyPair.mPrefKey;
         if (key.isEmpty()) {
-            key = values.getAsString(QueryKeys.COLUMN_KEY);
+            key = values.getAsString(RemoteContract.COLUMN_KEY);
         }
-        int type = values.getAsInteger(QueryKeys.COLUMN_TYPE);
-        Object value = SerializationUtils.deserialize(values.get(QueryKeys.COLUMN_VALUE), type);
+        int type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
+        Object value = RemoteUtils.deserialize(values.get(RemoteContract.COLUMN_VALUE), type);
         SharedPreferences preferences = getPreferences(prefKeyPair, true);
         SharedPreferences.Editor editor = preferences.edit();
         if (value == null) {
@@ -91,7 +91,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         } else if (value instanceof String) {
             editor.putString(key, (String)value);
         } else if (value instanceof Set<?>) {
-            editor.putStringSet(key, SerializationUtils.toStringSet(value));
+            editor.putStringSet(key, RemoteUtils.toStringSet(value));
         } else if (value instanceof Integer) {
             editor.putInt(key, (Integer)value);
         } else if (value instanceof Long) {
@@ -148,13 +148,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     }
 
     private int getPrefType(Object value) {
-        if (value == null) return QueryKeys.TYPE_NULL;
-        if (value instanceof String) return QueryKeys.TYPE_STRING;
-        if (value instanceof Set<?>) return QueryKeys.TYPE_STRING_SET;
-        if (value instanceof Integer) return QueryKeys.TYPE_INT;
-        if (value instanceof Long) return QueryKeys.TYPE_LONG;
-        if (value instanceof Float) return QueryKeys.TYPE_FLOAT;
-        if (value instanceof Boolean) return QueryKeys.TYPE_BOOLEAN;
+        if (value == null) return RemoteContract.TYPE_NULL;
+        if (value instanceof String) return RemoteContract.TYPE_STRING;
+        if (value instanceof Set<?>) return RemoteContract.TYPE_STRING_SET;
+        if (value instanceof Integer) return RemoteContract.TYPE_INT;
+        if (value instanceof Long) return RemoteContract.TYPE_LONG;
+        if (value instanceof Float) return RemoteContract.TYPE_FLOAT;
+        if (value instanceof Boolean) return RemoteContract.TYPE_BOOLEAN;
         throw new AssertionError("Unknown preference type: " + value.getClass());
     }
 
@@ -162,12 +162,12 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         Object[] row = new Object[projection.length];
         for (int i = 0; i < row.length; ++i) {
             String col = projection[i];
-            if (QueryKeys.COLUMN_KEY.equals(col)) {
+            if (RemoteContract.COLUMN_KEY.equals(col)) {
                 row[i] = key;
-            } else if (QueryKeys.COLUMN_TYPE.equals(col)) {
+            } else if (RemoteContract.COLUMN_TYPE.equals(col)) {
                 row[i] = getPrefType(value);
-            } else if (QueryKeys.COLUMN_VALUE.equals(col)) {
-                row[i] = SerializationUtils.serialize(value);
+            } else if (RemoteContract.COLUMN_VALUE.equals(col)) {
+                row[i] = RemoteUtils.serialize(value);
             } else {
                 throw new IllegalArgumentException("Invalid column name: " + col);
             }

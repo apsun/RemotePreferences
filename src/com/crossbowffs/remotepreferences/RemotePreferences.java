@@ -37,32 +37,32 @@ public class RemotePreferences implements SharedPreferences {
 
     @Override
     public String getString(String key, String defValue) {
-        return (String)querySingle(key, defValue, QueryKeys.TYPE_STRING);
+        return (String)querySingle(key, defValue, RemoteContract.TYPE_STRING);
     }
 
     @Override
     public Set<String> getStringSet(String key, Set<String> defValues) {
-        return SerializationUtils.toStringSet(querySingle(key, defValues, QueryKeys.TYPE_STRING_SET));
+        return RemoteUtils.toStringSet(querySingle(key, defValues, RemoteContract.TYPE_STRING_SET));
     }
 
     @Override
     public int getInt(String key, int defValue) {
-        return (Integer)querySingle(key, defValue, QueryKeys.TYPE_INT);
+        return (Integer)querySingle(key, defValue, RemoteContract.TYPE_INT);
     }
 
     @Override
     public long getLong(String key, long defValue) {
-        return (Long)querySingle(key, defValue, QueryKeys.TYPE_LONG);
+        return (Long)querySingle(key, defValue, RemoteContract.TYPE_LONG);
     }
 
     @Override
     public float getFloat(String key, float defValue) {
-        return (Float)querySingle(key, defValue, QueryKeys.TYPE_FLOAT);
+        return (Float)querySingle(key, defValue, RemoteContract.TYPE_FLOAT);
     }
 
     @Override
     public boolean getBoolean(String key, boolean defValue) {
-        return (Boolean)querySingle(key, defValue, QueryKeys.TYPE_BOOLEAN);
+        return (Boolean)querySingle(key, defValue, RemoteContract.TYPE_BOOLEAN);
     }
 
     @Override
@@ -93,10 +93,10 @@ public class RemotePreferences implements SharedPreferences {
 
     private Object querySingle(String key, Object defValue, int expectedType) {
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
-        String[] columns = {QueryKeys.COLUMN_TYPE, QueryKeys.COLUMN_VALUE};
+        String[] columns = {RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
         Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
         try {
-            if (cursor == null || !cursor.moveToFirst() || cursor.getInt(0) == QueryKeys.TYPE_NULL) {
+            if (cursor == null || !cursor.moveToFirst() || cursor.getInt(0) == RemoteContract.TYPE_NULL) {
                 return defValue;
             } else if (cursor.getInt(0) != expectedType) {
                 throw new ClassCastException("Preference type mismatch");
@@ -112,7 +112,7 @@ public class RemotePreferences implements SharedPreferences {
 
     private Map<String, Object> queryAll() {
         Uri uri = mBaseUri.buildUpon().appendPath("").build();
-        String[] columns = {QueryKeys.COLUMN_KEY, QueryKeys.COLUMN_TYPE, QueryKeys.COLUMN_VALUE};
+        String[] columns = {RemoteContract.COLUMN_KEY, RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
         Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
         try {
             HashMap<String, Object> map = new HashMap<String, Object>(0);
@@ -133,10 +133,10 @@ public class RemotePreferences implements SharedPreferences {
 
     private boolean containsKey(String key) {
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
-        String[] columns = {QueryKeys.COLUMN_TYPE};
+        String[] columns = {RemoteContract.COLUMN_TYPE};
         Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
         try {
-            return (cursor != null && cursor.moveToFirst() && cursor.getInt(0) != QueryKeys.TYPE_NULL);
+            return (cursor != null && cursor.moveToFirst() && cursor.getInt(0) != RemoteContract.TYPE_NULL);
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -147,17 +147,17 @@ public class RemotePreferences implements SharedPreferences {
     private Object getValue(Cursor cursor, int typeCol, int valueCol) {
         int expectedType = cursor.getInt(typeCol);
         switch (expectedType) {
-        case QueryKeys.TYPE_STRING:
+        case RemoteContract.TYPE_STRING:
             return cursor.getString(valueCol);
-        case QueryKeys.TYPE_STRING_SET:
-            return SerializationUtils.deserializeStringSet(cursor.getString(valueCol));
-        case QueryKeys.TYPE_INT:
+        case RemoteContract.TYPE_STRING_SET:
+            return RemoteUtils.deserializeStringSet(cursor.getString(valueCol));
+        case RemoteContract.TYPE_INT:
             return cursor.getInt(valueCol);
-        case QueryKeys.TYPE_LONG:
+        case RemoteContract.TYPE_LONG:
             return cursor.getLong(valueCol);
-        case QueryKeys.TYPE_FLOAT:
+        case RemoteContract.TYPE_FLOAT:
             return cursor.getFloat(valueCol);
-        case QueryKeys.TYPE_BOOLEAN:
+        case RemoteContract.TYPE_BOOLEAN:
             return cursor.getInt(valueCol) != 0;
         default:
             throw new AssertionError("Invalid expected type: " + expectedType);
@@ -170,51 +170,51 @@ public class RemotePreferences implements SharedPreferences {
 
         private ContentValues add(String key, int type) {
             ContentValues values = new ContentValues(3);
-            values.put(QueryKeys.COLUMN_KEY, key);
-            values.put(QueryKeys.COLUMN_TYPE, type);
+            values.put(RemoteContract.COLUMN_KEY, key);
+            values.put(RemoteContract.COLUMN_TYPE, type);
             mToAdd.add(values);
             return values;
         }
 
         @Override
         public Editor putString(String key, String value) {
-            add(key, QueryKeys.TYPE_STRING)
-                .put(QueryKeys.COLUMN_VALUE, value);
+            add(key, RemoteContract.TYPE_STRING)
+                .put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putStringSet(String key, Set<String> value) {
-            add(key, QueryKeys.TYPE_STRING_SET)
-                .put(QueryKeys.COLUMN_VALUE, SerializationUtils.serializeStringSet(value));
+            add(key, RemoteContract.TYPE_STRING_SET)
+                .put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(value));
             return this;
         }
 
         @Override
         public Editor putInt(String key, int value) {
-            add(key, QueryKeys.TYPE_INT)
-                .put(QueryKeys.COLUMN_VALUE, value);
+            add(key, RemoteContract.TYPE_INT)
+                .put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putLong(String key, long value) {
-            add(key, QueryKeys.TYPE_LONG)
-                .put(QueryKeys.COLUMN_VALUE, value);
+            add(key, RemoteContract.TYPE_LONG)
+                .put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putFloat(String key, float value) {
-            add(key, QueryKeys.TYPE_FLOAT)
-                .put(QueryKeys.COLUMN_VALUE, value);
+            add(key, RemoteContract.TYPE_FLOAT)
+                .put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putBoolean(String key, boolean value) {
-            add(key, QueryKeys.TYPE_BOOLEAN)
-                .put(QueryKeys.COLUMN_VALUE, value ? 1 : 0);
+            add(key, RemoteContract.TYPE_BOOLEAN)
+                .put(RemoteContract.COLUMN_VALUE, value ? 1 : 0);
             return this;
         }
 

@@ -1,6 +1,6 @@
 package com.crossbowffs.remotepreferences;
 
-/* package */ class QueryKeys {
+/* package */ class RemoteContract {
     public static final String COLUMN_KEY = "key";
     public static final String COLUMN_TYPE = "type";
     public static final String COLUMN_VALUE = "value";

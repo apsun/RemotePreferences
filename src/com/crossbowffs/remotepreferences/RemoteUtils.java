@@ -3,7 +3,7 @@ package com.crossbowffs.remotepreferences;
 import java.util.HashSet;
 import java.util.Set;
 
-/* package */ class SerializationUtils {
+/* package */ class RemoteUtils {
     @SuppressWarnings("unchecked")
     public static Set<String> toStringSet(Object value) {
         return (Set<String>)value;
@@ -13,7 +13,7 @@ import java.util.Set;
         if (value instanceof Boolean) {
             return (Boolean)value ? 1 : 0;
         } else if (value instanceof Set<?>) {
-            return SerializationUtils.serializeStringSet(toStringSet(value));
+            return RemoteUtils.serializeStringSet(toStringSet(value));
         } else {
             return value;
         }
@@ -22,10 +22,10 @@ import java.util.Set;
     public static Object deserialize(Object value, int expectedType) {
         if (value == null) {
             return null;
-        } else if (expectedType == QueryKeys.TYPE_BOOLEAN) {
+        } else if (expectedType == RemoteContract.TYPE_BOOLEAN) {
             return (Integer)value != 0;
-        } else if (expectedType == QueryKeys.TYPE_STRING_SET) {
-            return SerializationUtils.deserializeStringSet((String)value);
+        } else if (expectedType == RemoteContract.TYPE_STRING_SET) {
+            return RemoteUtils.deserializeStringSet((String)value);
         } else {
             return value;
         }
