@@ -27,9 +27,9 @@ public class RemotePreferences implements SharedPreferences {
      * Initializes a new remote preferences object.
      * You must use the same authority as the preference provider.
      * Note that if you pass invalid parameter values, the
-     * constructor will complete successfully, but all data accesses
-     * may either throw {@link IllegalArgumentException} or return the
-     * default value.
+     * constructor will complete successfully, but data accesses
+     * will either throw {@link IllegalArgumentException} or return
+     * default values.
      *
      * @param context Used to access the preference provider.
      * @param authority The authority of the preference provider.

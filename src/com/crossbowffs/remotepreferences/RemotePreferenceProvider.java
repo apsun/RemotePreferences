@@ -223,7 +223,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * read or written.
      *
      * @param prefName The name of the preference file.
-     * @param prefKey The preference key.
+     * @param prefKey The preference key. This is an empty string when handling the
+     *                {@link SharedPreferences#getAll()} and
+     *                {@link SharedPreferences.Editor#clear()} operations.
      * @param write {@code true} for "put" operations; {@code false} for "get" operations.
      * @return {@code true} if the access is allowed; {@code false} otherwise.
      */
