@@ -1,12 +1,12 @@
 package com.crossbowffs.remotepreferences;
 
+import android.annotation.TargetApi;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Handler;
 
 import java.lang.ref.WeakReference;
@@ -23,6 +23,18 @@ public class RemotePreferences implements SharedPreferences {
     private final Uri mBaseUri;
     private final WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver> mListeners;
 
+    /**
+     * Initializes a new remote preferences object.
+     * You must use the same authority as the preference provider.
+     * Note that if you pass invalid parameter values, the
+     * constructor will complete successfully, but all data accesses
+     * may either throw {@link IllegalArgumentException} or return the
+     * default value.
+     *
+     * @param context Used to access the preference provider.
+     * @param authority The authority of the preference provider.
+     * @param prefName The name of the preference file to access.
+     */
     public RemotePreferences(Context context, String authority, String prefName) {
         mContext = context;
         mHandler = new Handler(context.getMainLooper());
@@ -41,6 +53,7 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     @Override
+    @TargetApi(11)
     public Set<String> getStringSet(String key, Set<String> defValues) {
         return RemoteUtils.toStringSet(querySingle(key, defValues, RemoteContract.TYPE_STRING_SET));
     }
@@ -184,6 +197,7 @@ public class RemotePreferences implements SharedPreferences {
         }
 
         @Override
+        @TargetApi(11)
         public Editor putStringSet(String key, Set<String> value) {
             add(key, RemoteContract.TYPE_STRING_SET)
                 .put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(value));
@@ -243,13 +257,7 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public void apply() {
-            new AsyncTask<Void, Void, Void>() {
-                @Override
-                protected Void doInBackground(Void... params) {
-                    commit();
-                    return null;
-                }
-            }.execute();
+            commit();
         }
     }
 

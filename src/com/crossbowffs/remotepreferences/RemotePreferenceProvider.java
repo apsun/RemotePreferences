@@ -4,6 +4,7 @@ import android.content.*;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
+import android.os.Build;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,10 +14,14 @@ import java.util.Set;
 /**
  * Exposes {@link SharedPreferences} to other apps running on the device.
  *
- * To use, simply extend this class and call the constructor with the
- * appropriate authority and preference name parameters. When accessing
- * the preferences, use {@link RemotePreferences} initialized with the
- * same parameters.
+ * You must extend this class and declare a default constructor which
+ * calls the super constructor with the appropriate authority and
+ * preference file name parameters. Remember to add your provider to
+ * your AndroidManifest.xml file and set the {@code android:exported}
+ * property to true.
+ *
+ * To access the data from a remote process, use {@link RemotePreferences}
+ * initialized with the same authority and the desired preference file name.
  *
  * For granular access control, override {@link #checkAccess(String, String, boolean)}
  * and return {@code false} to deny the operation.
@@ -30,6 +35,16 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     private final Map<String, SharedPreferences> mPreferences;
     private final UriMatcher mUriMatcher;
 
+    /**
+     * Initializes the remote preference provider with the specified
+     * authority and preference files. The authority must match the
+     * {@code android:authorities} property defined in your manifest
+     * file. Only the specified preference files will be accessible
+     * through the provider.
+     *
+     * @param authority The authority of the provider.
+     * @param prefNames The names of the preference files to expose.
+     */
     public RemotePreferenceProvider(String authority, String[] prefNames) {
         mBaseUri = Uri.parse("content://" + authority);
         mPrefNames = prefNames;
@@ -52,18 +67,18 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        PrefKeyPair prefKeyPair = parseUri(uri);
-        SharedPreferences preferences = getPreferences(prefKeyPair, false);
+        PrefNameKeyPair nameKeyPair = parseUri(uri);
+        SharedPreferences preferences = getPreferences(nameKeyPair, false);
         Map<String, ?> preferenceMap = preferences.getAll();
         MatrixCursor cursor = new MatrixCursor(projection);
-        if (prefKeyPair.mPrefKey.isEmpty()) {
+        if (nameKeyPair.key.length() == 0) {
             for (Map.Entry<String, ?> entry : preferenceMap.entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
                 cursor.addRow(buildRow(projection, key, value));
             }
         } else {
-            String key = prefKeyPair.mPrefKey;
+            String key = nameKeyPair.key;
             Object value = preferenceMap.get(key);
             cursor.addRow(buildRow(projection, key, value));
         }
@@ -77,21 +92,25 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-        PrefKeyPair prefKeyPair = parseUri(uri);
-        String key = prefKeyPair.mPrefKey;
-        if (key.isEmpty()) {
+        PrefNameKeyPair nameKeyPair = parseUri(uri);
+        String key = nameKeyPair.key;
+        if (key.length() == 0) {
             key = values.getAsString(RemoteContract.COLUMN_KEY);
         }
         int type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
         Object value = RemoteUtils.deserialize(values.get(RemoteContract.COLUMN_VALUE), type);
-        SharedPreferences preferences = getPreferences(prefKeyPair, true);
+        SharedPreferences preferences = getPreferences(nameKeyPair, true);
         SharedPreferences.Editor editor = preferences.edit();
         if (value == null) {
             throw new IllegalArgumentException("Attempting to insert preference with null value");
         } else if (value instanceof String) {
             editor.putString(key, (String)value);
         } else if (value instanceof Set<?>) {
-            editor.putStringSet(key, RemoteUtils.toStringSet(value));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                editor.putStringSet(key, RemoteUtils.toStringSet(value));
+            } else {
+                throw new IllegalArgumentException("String set preferences not supported on API < 11");
+            }
         } else if (value instanceof Integer) {
             editor.putInt(key, (Integer)value);
         } else if (value instanceof Long) {
@@ -109,10 +128,10 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        PrefKeyPair prefKeyPair = parseUri(uri);
-        String key = prefKeyPair.mPrefKey;
-        SharedPreferences preferences = getPreferences(prefKeyPair, true);
-        if (key.isEmpty()) {
+        PrefNameKeyPair nameKeyPair = parseUri(uri);
+        String key = nameKeyPair.key;
+        SharedPreferences preferences = getPreferences(nameKeyPair, true);
+        if (key.length() == 0) {
             preferences.edit().clear().commit();
         } else {
             preferences.edit().remove(key).commit();
@@ -133,7 +152,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         getContext().getContentResolver().notifyChange(uri, null);
     }
 
-    private PrefKeyPair parseUri(Uri uri) {
+    private PrefNameKeyPair parseUri(Uri uri) {
         int match = mUriMatcher.match(uri);
         if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
             throw new IllegalArgumentException("Invalid URI: " + uri);
@@ -144,7 +163,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         if (match == PREFERENCE_ID) {
             prefKey = pathSegments.get(1);
         }
-        return new PrefKeyPair(prefName, prefKey);
+        return new PrefNameKeyPair(prefName, prefKey);
     }
 
     private int getPrefType(Object value) {
@@ -175,9 +194,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return row;
     }
 
-    private SharedPreferences getPreferences(PrefKeyPair prefKeyPair, boolean write) {
-        String prefName = prefKeyPair.mPrefName;
-        String prefKey = prefKeyPair.mPrefKey;
+    private SharedPreferences getPreferences(PrefNameKeyPair nameKeyPair, boolean write) {
+        String prefName = nameKeyPair.name;
+        String prefKey = nameKeyPair.key;
         SharedPreferences prefs = mPreferences.get(prefName);
         if (prefs == null) {
             throw new IllegalArgumentException("Unknown preference file name: " + prefName);
@@ -197,17 +216,28 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         throw new AssertionError("Cannot find name for SharedPreferences");
     }
 
+    /**
+     * Checks whether a specific preference is accessible by clients.
+     * The default implementation returns {@code true} for all accesses.
+     * You may override this method to control which preferences can be
+     * read or written.
+     *
+     * @param prefName The name of the preference file.
+     * @param prefKey The preference key.
+     * @param write {@code true} for "put" operations; {@code false} for "get" operations.
+     * @return {@code true} if the access is allowed; {@code false} otherwise.
+     */
     protected boolean checkAccess(String prefName, String prefKey, boolean write) {
         return true;
     }
 
-    private class PrefKeyPair {
-        private final String mPrefName;
-        private final String mPrefKey;
+    private class PrefNameKeyPair {
+        private final String name;
+        private final String key;
 
-        private PrefKeyPair(String prefName, String prefKey) {
-            mPrefName = prefName;
-            mPrefKey = prefKey;
+        private PrefNameKeyPair(String prefName, String prefKey) {
+            name = prefName;
+            key = prefKey;
         }
     }
 }
