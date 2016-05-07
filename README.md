@@ -41,20 +41,19 @@ AndroidManifest.xml
     android:exported="true"/>
 ```
 
-Next, replace all uses of `SharedPreferences` with `RemotePreferences`.
-For example, if this was your original code:
-
-```Java
-SharedPreferences prefs = context.getSharedPreferences("main_prefs", MODE_WORLD_READABLE);
-```
-
-Simply change it to:
+Now, you can use `RemotePreferences` just like you would `SharedPreferences`.
+To create a new instance, just pass in the authority and the preference file name,
+like so:
 
 ```Java
 SharedPreferences prefs = new RemotePreferences(context, "com.example.myapp.preferences", "main_prefs");
 ```
 
 That's it! Simple, right?
+
+Note that you can (and should) still use `getSharedPreferences(prefName, MODE_PRIVATE)`
+if your code is executing within the app that owns the preferences. Only use
+`RemotePreferences` when accessing preferences from the context of another app.
 
 
 ## Features
