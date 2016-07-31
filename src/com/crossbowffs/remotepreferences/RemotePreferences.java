@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 
 import java.lang.ref.WeakReference;
@@ -38,8 +39,8 @@ public class RemotePreferences implements SharedPreferences {
 
     /**
      * Initializes a new remote preferences object. If {@code strictMode}
-     * is {@code true} and the remote preferences cannot be accessed,
-     * read/write operations on the preference object will throw a
+     * is {@code true} and the remote preference provider cannot be accessed,
+     * read/write operations on this object will throw a
      * {@link RemotePreferenceAccessException}. Otherwise, default values
      * will be returned.
      *
@@ -49,6 +50,9 @@ public class RemotePreferences implements SharedPreferences {
      * @param strictMode Whether strict mode is enabled.
      */
     public RemotePreferences(Context context, String authority, String prefName, boolean strictMode) {
+        checkNotNull("authority", authority);
+        checkNotNull("context", context);
+        checkNotNull("prefName", prefName);
         mContext = context;
         mHandler = new Handler(context.getMainLooper());
         mBaseUri = Uri.parse("content://" + authority).buildUpon().appendPath(prefName).build();
@@ -69,6 +73,9 @@ public class RemotePreferences implements SharedPreferences {
     @Override
     @TargetApi(11)
     public Set<String> getStringSet(String key, Set<String> defValues) {
+        if (Build.VERSION.SDK_INT < 11) {
+            throw new UnsupportedOperationException("String sets only supported on API 11 and above");
+        }
         return RemoteUtils.toStringSet(querySingle(key, defValues, RemoteContract.TYPE_STRING_SET));
     }
 
@@ -104,6 +111,7 @@ public class RemotePreferences implements SharedPreferences {
 
     @Override
     public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        checkNotNull("listener", listener);
         if (mListeners.containsKey(listener)) return;
         PreferenceContentObserver observer = new PreferenceContentObserver(listener);
         mListeners.put(listener, observer);
@@ -112,9 +120,22 @@ public class RemotePreferences implements SharedPreferences {
 
     @Override
     public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        checkNotNull("listener", listener);
         PreferenceContentObserver observer = mListeners.remove(listener);
         if (observer != null) {
             mContext.getContentResolver().unregisterContentObserver(observer);
+        }
+    }
+
+    private void checkNotNull(String name, Object object) {
+        if (object == null) {
+            throw new IllegalArgumentException(name + " is null");
+        }
+    }
+
+    private void checkKeyNotEmpty(String key) {
+        if (key == null || key.length() == 0) {
+            throw new IllegalArgumentException("Key is null or empty");
         }
     }
 
@@ -164,6 +185,7 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     private Object querySingle(String key, Object defValue, int expectedType) {
+        checkKeyNotEmpty(key);
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
         String[] columns = {RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
         Cursor cursor = query(uri, columns);
@@ -204,13 +226,12 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     private boolean containsKey(String key) {
+        checkKeyNotEmpty(key);
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
         String[] columns = {RemoteContract.COLUMN_TYPE};
         Cursor cursor = query(uri, columns);
         try {
-            if (cursor == null) return false;
-            if (!cursor.moveToFirst()) return false;
-            return cursor.getInt(0) != RemoteContract.TYPE_NULL;
+            return (cursor != null && cursor.moveToFirst() && cursor.getInt(0) != RemoteContract.TYPE_NULL);
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -243,6 +264,7 @@ public class RemotePreferences implements SharedPreferences {
         private final HashSet<String> mToRemove = new HashSet<String>();
 
         private ContentValues add(String key, int type) {
+            checkKeyNotEmpty(key);
             ContentValues values = new ContentValues(4); // 3 keys / 0.75 resize factor
             values.put(RemoteContract.COLUMN_KEY, key);
             values.put(RemoteContract.COLUMN_TYPE, type);
@@ -252,6 +274,7 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public Editor putString(String key, String value) {
+            checkNotNull("value", value);
             add(key, RemoteContract.TYPE_STRING)
                 .put(RemoteContract.COLUMN_VALUE, value);
             return this;
@@ -260,6 +283,10 @@ public class RemotePreferences implements SharedPreferences {
         @Override
         @TargetApi(11)
         public Editor putStringSet(String key, Set<String> value) {
+            if (Build.VERSION.SDK_INT < 11) {
+                throw new UnsupportedOperationException("String sets only supported on API 11 and above");
+            }
+            checkNotNull("value", value);
             add(key, RemoteContract.TYPE_STRING_SET)
                 .put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(value));
             return this;
@@ -295,15 +322,15 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public Editor remove(String key) {
-            if (!mToRemove.contains("")) {
-                mToRemove.add(key);
-            }
+            checkKeyNotEmpty(key);
+            mToRemove.add(key);
             return this;
         }
 
         @Override
         public Editor clear() {
-            return remove("");
+            mToRemove.add("");
+            return this;
         }
 
         @Override

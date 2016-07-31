@@ -97,6 +97,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         if (key.length() == 0) {
             key = values.getAsString(RemoteContract.COLUMN_KEY);
         }
+        if (key == null || key.length() == 0) {
+            throw new IllegalArgumentException("Attempting to insert preference with null or empty key");
+        }
         int type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
         Object value = RemoteUtils.deserialize(values.get(RemoteContract.COLUMN_VALUE), type);
         SharedPreferences preferences = getPreferences(nameKeyPair.name, key, true);
@@ -130,7 +133,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
         String key = nameKeyPair.key;
-        SharedPreferences preferences = getPreferences(nameKeyPair.name, nameKeyPair.key, true);
+        SharedPreferences preferences = getPreferences(nameKeyPair.name, key, true);
         if (key.length() == 0) {
             preferences.edit().clear().commit();
         } else {

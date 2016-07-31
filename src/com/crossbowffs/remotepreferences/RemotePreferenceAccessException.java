@@ -1,14 +1,13 @@
 package com.crossbowffs.remotepreferences;
 
 /**
- * Thrown if the preferences could not be loaded. This is commonly
- * thrown under these conditions:
+ * Thrown if the preference provider could not be accessed.
+ * This is commonly thrown under these conditions:
  * <ul>
  *     <li>Preference provider component is disabled</li>
  *     <li>Preference provider denied access via {@link RemotePreferenceProvider#checkAccess(String, String, boolean)}</li>
  *     <li>Insufficient permissions to access provider (via AndroidManifest.xml)</li>
- *     <li>Incorrect provider authority passed to constructor</li>
- *     <li>Accessing string set preference on pre-API11 devices</li>
+ *     <li>Incorrect provider authority/file name passed to constructor</li>
  * </ul>
  */
 public class RemotePreferenceAccessException extends RuntimeException {
