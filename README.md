@@ -6,92 +6,77 @@ A word of warning: this library is currently under development and may
 not be suitable for usage in a production environment. Use at your own risk!
 
 
-## Adding the library
+## Changelog
 
-Simply add the following line to your `build.gradle` depdencies section:
+0.2
 
-`compile 'com.crossbowffs.remotepreferences:remotepreferences:0.1'`
+- Fixed catastrophic security bug allowing anyone to write to preferences
+- Added strict mode to distinguish between "cannot access provider" vs. "key doesn't exist"
+- Keys can no longer be `null` or `""`, values can no longer be `null`
+
+0.1
+
+- Initial release.
 
 
-## Usage
+## Installing
 
-First, subclass `RemotePreferenceProvider` (remember to add
-the corresponding entry in your `AndroidManifest.xml`) and
-implement the default constructor, which should call the super
-constructor with the appropriate `authority` and `prefNames`
-parameters. `authority` should have the same value as the
-`android:authorities` attribute in `AndroidManifest.xml`, and
-`prefNames` contains the names of the preference files you wish
-to export. For example:
+1\. Add the dependency to your `build.gradle` file:
 
-MyPreferenceProvider.java
+```
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.2'
+}
+```
+
+2\. Subclass `RemotePreferenceProvider` and implement a default
+constructor which calls the super constructor with an authority
+(pick one, e.g. `"com.example.app.preferences"`) and an array of
+preference files to expose:
+
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
-        super("com.example.myapp.preferences", new String[] {"main_prefs"});
+        super("com.example.app.preferences", new String[] {"main_prefs"});
     }
 }
 ```
 
-AndroidManifest.xml
+3\. Add the corresponding entry to `AndroidManifest.xml`, with
+`android:authorities` equal to the value you picked in step 2:
+
 ```XML
 <provider
-    android:authorities="com.example.myapp.preferences"
+    android:authorities="com.example.app.preferences"
     android:name=".MyPreferenceProvider"
     android:exported="true"/>
 ```
 
-Now, you can use `RemotePreferences` just like you would `SharedPreferences`.
-To create a new instance, just pass in the authority and the preference file name,
-like so:
+4\. You're all set! To access your preferences, create a new
+instance of `RemotePreferences` with the authority value you
+picked earlier and the name of the preference file:
 
 ```Java
-SharedPreferences prefs = new RemotePreferences(context, "com.example.myapp.preferences", "main_prefs");
+SharedPreferences prefs = new RemotePreferences(context, "com.example.app.preferences", "main_prefs");
 ```
 
-That's it! Simple, right?
-
-Note that you can (and should) still use `getSharedPreferences(prefName, MODE_PRIVATE)`
+Note that you can (and should) still use `getSharedPreferences("main_prefs", MODE_PRIVATE)`
 if your code is executing within the app that owns the preferences. Only use
 `RemotePreferences` when accessing preferences from the context of another app.
 
 
-## Features
+## Compatibility
 
-`RemotePreferences` is fully compatible with the `SharedPreferences` API!
-If you need a feature support table to convince you, look no further:
+`RemotePreferences` is fully compatible with the `SharedPreferences`
+API, with these minor exceptions:
 
-| Method                                                                                  | Supported |
-|-----------------------------------------------------------------------------------------|-----------|
-| `getAll()`                                                                              | YES       |
-| `getString(String key, String defValue)`                                                | YES       |
-| `getStringSet(String key, Set<String> defValues)`                                       | YES*      |
-| `getInt(String key, int defValue)`                                                      | YES       |
-| `getLong(String key, long defValue)`                                                    | YES       |
-| `getFloat(String key, float defValue)`                                                  | YES       |
-| `getBoolean(String key, boolean defValue)`                                              | YES       |
-| `contains(String key)`                                                                  | YES       |
-| `edit()`                                                                                | YES       |
-| `registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener)`   | YES       |
-| `unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener)` | YES       |
-
-But wait, what about preference editing?
-
-| Method                                          | Supported |
-|-------------------------------------------------|-----------|
-| `putString(String key, String value)`           | YES       |
-| `putStringSet(String key, Set<String> value)`   | YES*      |
-| `putInt(String key, int value)`                 | YES       |
-| `putLong(String key, long value)`               | YES       |
-| `putFloat(String key, float value)`             | YES       |
-| `putBoolean(String key, boolean value)`         | YES       |
-| `remove(String key)`                            | YES       |
-| `clear()`                                       | YES       |
-| `commit()`                                      | YES       |
-| `apply()`                                       | YES**     |
-
-\* String set operations are only supported on Android API 11 or higher  
-\*\* `apply()` is executed synchronously; use `AsyncTask` if performance is an issue
+- String set operations are only supported on Android API 11 or higher
+- `apply()` is executed synchronously (i.e. it's equivalent to `commit()`)
+- Keys cannot be empty (`null` or `""`), values cannot be `null`
 
 
 ## Why would I need this?
