@@ -68,7 +68,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
-        SharedPreferences preferences = getPreferences(nameKeyPair, false);
+        SharedPreferences preferences = getPreferences(nameKeyPair.name, nameKeyPair.key, false);
         Map<String, ?> preferenceMap = preferences.getAll();
         MatrixCursor cursor = new MatrixCursor(projection);
         if (nameKeyPair.key.length() == 0) {
@@ -99,7 +99,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
         int type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
         Object value = RemoteUtils.deserialize(values.get(RemoteContract.COLUMN_VALUE), type);
-        SharedPreferences preferences = getPreferences(nameKeyPair, true);
+        SharedPreferences preferences = getPreferences(nameKeyPair.name, key, true);
         SharedPreferences.Editor editor = preferences.edit();
         if (value == null) {
             throw new IllegalArgumentException("Attempting to insert preference with null value");
@@ -130,7 +130,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
         String key = nameKeyPair.key;
-        SharedPreferences preferences = getPreferences(nameKeyPair, true);
+        SharedPreferences preferences = getPreferences(nameKeyPair.name, nameKeyPair.key, true);
         if (key.length() == 0) {
             preferences.edit().clear().commit();
         } else {
@@ -194,9 +194,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return row;
     }
 
-    private SharedPreferences getPreferences(PrefNameKeyPair nameKeyPair, boolean write) {
-        String prefName = nameKeyPair.name;
-        String prefKey = nameKeyPair.key;
+    private SharedPreferences getPreferences(String prefName, String prefKey, boolean write) {
         SharedPreferences prefs = mPreferences.get(prefName);
         if (prefs == null) {
             throw new IllegalArgumentException("Unknown preference file name: " + prefName);
