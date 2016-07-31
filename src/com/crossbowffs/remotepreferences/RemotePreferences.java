@@ -22,24 +22,38 @@ public class RemotePreferences implements SharedPreferences {
     private final Handler mHandler;
     private final Uri mBaseUri;
     private final WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver> mListeners;
+    private final boolean mStrictMode;
 
     /**
-     * Initializes a new remote preferences object.
-     * You must use the same authority as the preference provider.
-     * Note that if you pass invalid parameter values, the
-     * constructor will complete successfully, but data accesses
-     * will either throw {@link IllegalArgumentException} or return
-     * default values.
+     * Initializes a new remote preferences object, with strict
+     * mode disabled.
      *
      * @param context Used to access the preference provider.
      * @param authority The authority of the preference provider.
      * @param prefName The name of the preference file to access.
      */
     public RemotePreferences(Context context, String authority, String prefName) {
+        this(context, authority, prefName, false);
+    }
+
+    /**
+     * Initializes a new remote preferences object. If {@code strictMode}
+     * is {@code true} and the remote preferences cannot be accessed,
+     * read/write operations on the preference object will throw a
+     * {@link RemotePreferenceAccessException}. Otherwise, default values
+     * will be returned.
+     *
+     * @param context Used to access the preference provider.
+     * @param authority The authority of the preference provider.
+     * @param prefName The name of the preference file to access.
+     * @param strictMode Whether strict mode is enabled.
+     */
+    public RemotePreferences(Context context, String authority, String prefName, boolean strictMode) {
         mContext = context;
         mHandler = new Handler(context.getMainLooper());
         mBaseUri = Uri.parse("content://" + authority).buildUpon().appendPath(prefName).build();
         mListeners = new WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver>();
+        mStrictMode = strictMode;
     }
 
     @Override
@@ -104,10 +118,55 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    private boolean wrapException(Exception e) {
+        if (mStrictMode) {
+            throw new RemotePreferenceAccessException(e);
+        } else {
+            return false;
+        }
+    }
+
+    private Cursor query(Uri uri, String[] columns) {
+        Cursor cursor = null;
+        try {
+            cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
+        } catch (SecurityException e) {
+            if (mStrictMode) {
+                throw new RemotePreferenceAccessException(e);
+            }
+        }
+        if (cursor == null && mStrictMode) {
+            throw new RemotePreferenceAccessException("query() returned null cursor");
+        }
+        return cursor;
+    }
+
+    private boolean delete(Uri uri) {
+        try {
+            mContext.getContentResolver().delete(uri, null, null);
+        } catch (SecurityException e) {
+            return wrapException(e);
+        } catch (IllegalArgumentException e) {
+            return wrapException(e);
+        }
+        return true;
+    }
+
+    private boolean bulkInsert(Uri uri, ContentValues[] values) {
+        try {
+            mContext.getContentResolver().bulkInsert(uri, values);
+        } catch (SecurityException e) {
+            return wrapException(e);
+        } catch (IllegalArgumentException e) {
+            return wrapException(e);
+        }
+        return true;
+    }
+
     private Object querySingle(String key, Object defValue, int expectedType) {
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
         String[] columns = {RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
-        Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
+        Cursor cursor = query(uri, columns);
         try {
             if (cursor == null || !cursor.moveToFirst() || cursor.getInt(0) == RemoteContract.TYPE_NULL) {
                 return defValue;
@@ -126,9 +185,9 @@ public class RemotePreferences implements SharedPreferences {
     private Map<String, Object> queryAll() {
         Uri uri = mBaseUri.buildUpon().appendPath("").build();
         String[] columns = {RemoteContract.COLUMN_KEY, RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
-        Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
+        Cursor cursor = query(uri, columns);
         try {
-            HashMap<String, Object> map = new HashMap<String, Object>(0);
+            HashMap<String, Object> map = new HashMap<String, Object>();
             if (cursor == null) {
                 return map;
             }
@@ -147,9 +206,11 @@ public class RemotePreferences implements SharedPreferences {
     private boolean containsKey(String key) {
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
         String[] columns = {RemoteContract.COLUMN_TYPE};
-        Cursor cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
+        Cursor cursor = query(uri, columns);
         try {
-            return (cursor != null && cursor.moveToFirst() && cursor.getInt(0) != RemoteContract.TYPE_NULL);
+            if (cursor == null) return false;
+            if (!cursor.moveToFirst()) return false;
+            return cursor.getInt(0) != RemoteContract.TYPE_NULL;
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -178,11 +239,11 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     private class RemotePreferencesEditor implements Editor {
-        private final List<ContentValues> mToAdd = new ArrayList<ContentValues>();
-        private final Set<String> mToRemove = new HashSet<String>();
+        private final ArrayList<ContentValues> mToAdd = new ArrayList<ContentValues>();
+        private final HashSet<String> mToRemove = new HashSet<String>();
 
         private ContentValues add(String key, int type) {
-            ContentValues values = new ContentValues(3);
+            ContentValues values = new ContentValues(4); // 3 keys / 0.75 resize factor
             values.put(RemoteContract.COLUMN_KEY, key);
             values.put(RemoteContract.COLUMN_TYPE, type);
             mToAdd.add(values);
@@ -234,7 +295,9 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public Editor remove(String key) {
-            mToRemove.add(key);
+            if (!mToRemove.contains("")) {
+                mToRemove.add(key);
+            }
             return this;
         }
 
@@ -245,14 +308,20 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public boolean commit() {
+            // WARNING: This method may corrupt preference state if any
+            // but the first operation fails. There is no good solution
+            // to this (applyBatch doesn't provide a sufficient API), so
+            // we'll just have to pray that all exceptions are thrown on
+            // the first access.
             for (String key : mToRemove) {
                 Uri uri = mBaseUri.buildUpon().appendPath(key).build();
-                mContext.getContentResolver().delete(uri, null, null);
+                if (!delete(uri)) {
+                    return false;
+                }
             }
             ContentValues[] values = mToAdd.toArray(new ContentValues[mToAdd.size()]);
             Uri uri = mBaseUri.buildUpon().appendPath("").build();
-            mContext.getContentResolver().bulkInsert(uri, values);
-            return true;
+            return bulkInsert(uri, values);
         }
 
         @Override
