@@ -34,12 +34,12 @@ public class MyPreferenceProvider extends RemotePreferenceProvider {
 ```
 
 3\. Add the corresponding entry to `AndroidManifest.xml`, with
-`android:authorities` equal to the value you picked in step 2:
+`android:authorities` equal to the value you picked in the last step:
 
 ```XML
 <provider
-    android:authorities="com.example.app.preferences"
     android:name=".MyPreferenceProvider"
+    android:authorities="com.example.app.preferences"
     android:exported="true"/>
 ```
 
@@ -51,7 +51,7 @@ picked earlier and the name of the preference file:
 SharedPreferences prefs = new RemotePreferences(context, "com.example.app.preferences", "main_prefs");
 ```
 
-Note that you can (and should) still use `getSharedPreferences("main_prefs", MODE_PRIVATE)`
+Note that you should still use `context.getSharedPreferences("main_prefs", MODE_PRIVATE)`
 if your code is executing within the app that owns the preferences. Only use
 `RemotePreferences` when accessing preferences from the context of another app.
 
@@ -104,9 +104,9 @@ protected boolean checkAccess(String prefName, String prefKey, boolean write) {
 ## Strict mode
 
 To maintain API compatibility with `SharedPreferences`, by default any errors
-encountered while accessing the preference provider will by ignored, resulting in
-default values being returned from the getter methods. Commonly, this can be
-caused by bugs in your code, or the user disabling your app/provider component.
+encountered while accessing the preference provider will be ignored, resulting
+in default values being returned from the getter methods. This can be caused
+by bugs in your code, or the user disabling your app/provider component.
 To detect and handle this scenario, you may opt-in to *strict mode* by passing
 an extra parameter to the `RemotePreferences` constructor:
 
@@ -127,18 +127,14 @@ try {
 } catch (RemotePreferenceAccessException e) {
     // Handle the error
 }
-// Use the preference values
 ```
 
 
 ## Compatibility
 
 `RemotePreferences` is fully compatible with the `SharedPreferences`
-API, with these minor exceptions:
-
-- String set operations are only supported on Android API 11 or higher
-- `apply()` is executed synchronously (i.e. it's equivalent to `commit()`)
-- Keys cannot be empty (`null` or `""`), values cannot be `null`
+API, with the minor exception that keys cannot be empty (`null` or `""`),
+and values cannot be `null`.
 
 
 ## Why would I need this?
