@@ -33,8 +33,13 @@ public class MyPreferenceProvider extends RemotePreferenceProvider {
 }
 ```
 
+If you use `PreferenceManager#getDefaultSharedPreferences`, the
+preference file name is your package name + `_preferences`, e.g.
+`com.example.app_preferences`.
+
 3\. Add the corresponding entry to `AndroidManifest.xml`, with
-`android:authorities` equal to the value you picked in the last step:
+`android:authorities` equal to the value you picked in the last step,
+and `android:exported` set to `true`:
 
 ```XML
 <provider
@@ -90,9 +95,7 @@ protected boolean checkAccess(String prefName, String prefKey, boolean write) {
     }
 
     // Only allow access from certain apps
-    // This is usually the package you are hooking in Xposed
-    String callerPackage = getCallingPackage();
-    if (!"com.example.otherapp".equals(callerPackage)) {
+    if (!"com.example.otherapp".equals(getCallingPackage())) {
         return false;
     }
 
@@ -114,9 +117,9 @@ an extra parameter to the `RemotePreferences` constructor:
 SharedPreferences prefs = new RemotePreferences(context, authority, prefName, true);
 ```
 
-Now, if the preference provider cannot be accessed, an exception will be
-thrown. You can handle this by wrapping your preference accesses in a
-try-catch block:
+Now, if the preference provider cannot be accessed, a
+`RemotePreferenceAccessException` will be thrown. You can handle this by
+wrapping your preference accesses in a try-catch block:
 
 ```Java
 int intValue;
