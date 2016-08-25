@@ -76,7 +76,7 @@ public class RemotePreferences implements SharedPreferences {
         if (Build.VERSION.SDK_INT < 11) {
             throw new UnsupportedOperationException("String sets only supported on API 11 and above");
         }
-        return RemoteUtils.toStringSet(querySingle(key, defValues, RemoteContract.TYPE_STRING_SET));
+        return RemoteUtils.castStringSet(querySingle(key, defValues, RemoteContract.TYPE_STRING_SET));
     }
 
     @Override
@@ -274,7 +274,6 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public Editor putString(String key, String value) {
-            checkNotNull("value", value);
             add(key, RemoteContract.TYPE_STRING)
                 .put(RemoteContract.COLUMN_VALUE, value);
             return this;
@@ -286,7 +285,6 @@ public class RemotePreferences implements SharedPreferences {
             if (Build.VERSION.SDK_INT < 11) {
                 throw new UnsupportedOperationException("String sets only supported on API 11 and above");
             }
-            checkNotNull("value", value);
             add(key, RemoteContract.TYPE_STRING_SET)
                 .put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(value));
             return this;

@@ -9,7 +9,6 @@ import android.os.Build;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Exposes {@link SharedPreferences} to other apps running on the device.
@@ -70,6 +69,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         PrefNameKeyPair nameKeyPair = parseUri(uri);
         SharedPreferences preferences = getPreferences(nameKeyPair.name, nameKeyPair.key, false);
         Map<String, ?> preferenceMap = preferences.getAll();
+        if (projection == null) {
+            projection = new String[] {
+                RemoteContract.COLUMN_KEY,
+                RemoteContract.COLUMN_TYPE,
+                RemoteContract.COLUMN_VALUE
+            };
+        }
         MatrixCursor cursor = new MatrixCursor(projection);
         if (nameKeyPair.key.length() == 0) {
             for (Map.Entry<String, ?> entry : preferenceMap.entrySet()) {
@@ -93,37 +99,66 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
+
+        // Get preference key from URI, or fall back to ContentValues
+        // if the key was not specified in the URI. If the key is
+        // specified in both the URI and ContentValues, they must match.
         String key = nameKeyPair.key;
+        String keyFromContentValues = values.getAsString(RemoteContract.COLUMN_KEY);
         if (key.length() == 0) {
-            key = values.getAsString(RemoteContract.COLUMN_KEY);
+            key = keyFromContentValues;
+            if (key == null || key.length() == 0) {
+                throw new IllegalArgumentException("Attempting to insert preference with null or empty key");
+            }
+        } else if (keyFromContentValues != null && !key.equals(keyFromContentValues)) {
+            throw new IllegalArgumentException("Conflicting keys specified in URI and ContentValues");
         }
-        if (key == null || key.length() == 0) {
-            throw new IllegalArgumentException("Attempting to insert preference with null or empty key");
+
+        // Read the expected preference type
+        Integer type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
+        if (type == null) {
+            throw new IllegalArgumentException("No preference type specified");
         }
-        int type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
-        Object value = RemoteUtils.deserialize(values.get(RemoteContract.COLUMN_VALUE), type);
+
         SharedPreferences preferences = getPreferences(nameKeyPair.name, key, true);
         SharedPreferences.Editor editor = preferences.edit();
+        Object rawValue = values.get(RemoteContract.COLUMN_VALUE);
+        Object value = RemoteUtils.deserialize(rawValue, type);
+
+        // Delete the value if it's null, regardless of the
+        // expected preference type
         if (value == null) {
-            throw new IllegalArgumentException("Attempting to insert preference with null value");
-        } else if (value instanceof String) {
+            editor.remove(key).commit();
+            return uri;
+        }
+
+        // Otherwise write the value according to the
+        // expected preference type
+        switch (type) {
+        case RemoteContract.TYPE_STRING:
             editor.putString(key, (String)value);
-        } else if (value instanceof Set<?>) {
+            break;
+        case RemoteContract.TYPE_STRING_SET:
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                editor.putStringSet(key, RemoteUtils.toStringSet(value));
+                editor.putStringSet(key, RemoteUtils.castStringSet(value));
             } else {
                 throw new IllegalArgumentException("String set preferences not supported on API < 11");
             }
-        } else if (value instanceof Integer) {
+            break;
+        case RemoteContract.TYPE_INT:
             editor.putInt(key, (Integer)value);
-        } else if (value instanceof Long) {
+            break;
+        case RemoteContract.TYPE_LONG:
             editor.putLong(key, (Long)value);
-        } else if (value instanceof Float) {
+            break;
+        case RemoteContract.TYPE_FLOAT:
             editor.putFloat(key, (Float)value);
-        } else if (value instanceof Boolean) {
+            break;
+        case RemoteContract.TYPE_BOOLEAN:
             editor.putBoolean(key, (Boolean)value);
-        } else {
-            throw new IllegalArgumentException("Cannot set preference with type " + value.getClass());
+            break;
+        default:
+            throw new IllegalArgumentException("Cannot set preference with type " + type);
         }
         editor.commit();
         return uri;
@@ -169,17 +204,6 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return new PrefNameKeyPair(prefName, prefKey);
     }
 
-    private int getPrefType(Object value) {
-        if (value == null) return RemoteContract.TYPE_NULL;
-        if (value instanceof String) return RemoteContract.TYPE_STRING;
-        if (value instanceof Set<?>) return RemoteContract.TYPE_STRING_SET;
-        if (value instanceof Integer) return RemoteContract.TYPE_INT;
-        if (value instanceof Long) return RemoteContract.TYPE_LONG;
-        if (value instanceof Float) return RemoteContract.TYPE_FLOAT;
-        if (value instanceof Boolean) return RemoteContract.TYPE_BOOLEAN;
-        throw new AssertionError("Unknown preference type: " + value.getClass());
-    }
-
     private Object[] buildRow(String[] projection, String key, Object value) {
         Object[] row = new Object[projection.length];
         for (int i = 0; i < row.length; ++i) {
@@ -187,7 +211,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             if (RemoteContract.COLUMN_KEY.equals(col)) {
                 row[i] = key;
             } else if (RemoteContract.COLUMN_TYPE.equals(col)) {
-                row[i] = getPrefType(value);
+                row[i] = RemoteUtils.getPreferenceType(value);
             } else if (RemoteContract.COLUMN_VALUE.equals(col)) {
                 row[i] = RemoteUtils.serialize(value);
             } else {
