@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.2'
+    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.3'
 }
 ```
 
@@ -170,8 +170,9 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 0.3
 
-- Improved error checking if you are using the ContentProvider interface directly
 - Values can now be `null` again
+- Improved error checking if you are using the ContentProvider interface directly
+- Fixed `IllegalArgumentException` being thrown instead of `RemotePreferenceAccessException`
 
 0.2
 
