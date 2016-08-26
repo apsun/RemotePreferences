@@ -70,11 +70,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         SharedPreferences preferences = getPreferences(nameKeyPair.name, nameKeyPair.key, false);
         Map<String, ?> preferenceMap = preferences.getAll();
         if (projection == null) {
-            projection = new String[] {
-                RemoteContract.COLUMN_KEY,
-                RemoteContract.COLUMN_TYPE,
-                RemoteContract.COLUMN_VALUE
-            };
+            projection = RemoteContract.COLUMN_ALL;
         }
         MatrixCursor cursor = new MatrixCursor(projection);
         if (nameKeyPair.key.length() == 0) {
@@ -98,6 +94,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
+        // Ignore the operation if the values are null
+        if (values == null) {
+            return null;
+        }
+
         PrefNameKeyPair nameKeyPair = parseUri(uri);
 
         // Get preference key from URI, or fall back to ContentValues
@@ -126,14 +127,14 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         Object value = RemoteUtils.deserialize(rawValue, type);
 
         // Delete the value if it's null, regardless of the
-        // expected preference type
+        // expected preference type.
         if (value == null) {
             editor.remove(key).commit();
-            return uri;
+            return null;
         }
 
         // Otherwise write the value according to the
-        // expected preference type
+        // expected preference type.
         switch (type) {
         case RemoteContract.TYPE_STRING:
             editor.putString(key, (String)value);
@@ -161,7 +162,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             throw new IllegalArgumentException("Cannot set preference with type " + type);
         }
         editor.commit();
-        return uri;
+        return uri.buildUpon().appendPath(key).build();
     }
 
     @Override
@@ -179,7 +180,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        insert(uri, values);
+        if (values == null) {
+            delete(uri, selection, selectionArgs);
+        } else {
+            insert(uri, values);
+        }
         return 0;
     }
 

@@ -4,6 +4,11 @@ package com.crossbowffs.remotepreferences;
     public static final String COLUMN_KEY = "key";
     public static final String COLUMN_TYPE = "type";
     public static final String COLUMN_VALUE = "value";
+    public static final String[] COLUMN_ALL = {
+        RemoteContract.COLUMN_KEY,
+        RemoteContract.COLUMN_TYPE,
+        RemoteContract.COLUMN_VALUE
+    };
 
     public static final int TYPE_NULL = 0;
     public static final int TYPE_STRING = 1;
