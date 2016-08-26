@@ -136,8 +136,7 @@ try {
 ## Compatibility
 
 `RemotePreferences` is fully compatible with the `SharedPreferences`
-API, with the minor exception that keys cannot be empty (`null` or `""`),
-and values cannot be `null`.
+API, with the exception that **keys cannot be empty** (`null` or `""`).
 
 
 ## Why would I need this?
@@ -168,6 +167,11 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 
 ## Changelog
+
+0.3
+
+- Improved error checking if you are using the ContentProvider interface directly
+- Values can now be `null` again
 
 0.2
 
