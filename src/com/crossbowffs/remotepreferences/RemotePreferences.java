@@ -152,9 +152,9 @@ public class RemotePreferences implements SharedPreferences {
         try {
             cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
         } catch (SecurityException e) {
-            if (mStrictMode) {
-                throw new RemotePreferenceAccessException(e);
-            }
+            wrapException(e);
+        } catch (IllegalArgumentException e) {
+            wrapException(e);
         }
         if (cursor == null && mStrictMode) {
             throw new RemotePreferenceAccessException("query() returned null cursor");

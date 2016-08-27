@@ -168,11 +168,14 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 ## Changelog
 
+0.4
+
+- Fixed `IllegalArgumentException` being thrown instead of `RemotePreferenceAccessException`
+
 0.3
 
 - Values can now be `null` again
 - Improved error checking if you are using the ContentProvider interface directly
-- Fixed `IllegalArgumentException` being thrown instead of `RemotePreferenceAccessException`
 
 0.2
 
