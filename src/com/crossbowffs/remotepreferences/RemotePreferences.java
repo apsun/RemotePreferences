@@ -157,7 +157,7 @@ public class RemotePreferences implements SharedPreferences {
             wrapException(e);
         }
         if (cursor == null && mStrictMode) {
-            throw new RemotePreferenceAccessException("query() returned null cursor");
+            throw new RemotePreferenceAccessException("query() failed or returned null cursor");
         }
         return cursor;
     }

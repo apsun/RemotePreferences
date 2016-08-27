@@ -16,7 +16,7 @@ apply plugin: "com.jfrog.bintray"
 apply plugin: "com.github.dcendents.android-maven"
 
 group = "com.crossbowffs.remotepreferences"
-version = "0.3"
+version = "0.4"
 
 android {
     compileSdkVersion 24
@@ -25,8 +25,8 @@ android {
     defaultConfig {
         minSdkVersion 1
         targetSdkVersion 24
-        versionCode 3
-        versionName "0.3"
+        versionCode 4
+        versionName "0.4"
     }
 
     sourceSets {
@@ -67,7 +67,7 @@ bintray {
         vcsUrl = "https://github.com/apsun/RemotePreferences.git"
         configurations = ["archives"]
         version {
-            name = "0.3"
+            name = "0.4"
         }
     }
 }
@@ -83,7 +83,7 @@ install {
             packaging "aar"
             groupId "com.crossbowffs.remotepreferences"
             artifactId "remotepreferences"
-            version "0.3"
+            version "0.4"
 
             licenses {
                 license {
