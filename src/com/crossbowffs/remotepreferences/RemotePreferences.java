@@ -151,9 +151,7 @@ public class RemotePreferences implements SharedPreferences {
         Cursor cursor = null;
         try {
             cursor = mContext.getContentResolver().query(uri, columns, null, null, null);
-        } catch (SecurityException e) {
-            wrapException(e);
-        } catch (IllegalArgumentException e) {
+        } catch (Exception e) {
             wrapException(e);
         }
         if (cursor == null && mStrictMode) {
@@ -165,9 +163,7 @@ public class RemotePreferences implements SharedPreferences {
     private boolean delete(Uri uri) {
         try {
             mContext.getContentResolver().delete(uri, null, null);
-        } catch (SecurityException e) {
-            return wrapException(e);
-        } catch (IllegalArgumentException e) {
+        } catch (Exception e) {
             return wrapException(e);
         }
         return true;
@@ -176,9 +172,7 @@ public class RemotePreferences implements SharedPreferences {
     private boolean bulkInsert(Uri uri, ContentValues[] values) {
         try {
             mContext.getContentResolver().bulkInsert(uri, values);
-        } catch (SecurityException e) {
-            return wrapException(e);
-        } catch (IllegalArgumentException e) {
+        } catch (Exception e) {
             return wrapException(e);
         }
         return true;
