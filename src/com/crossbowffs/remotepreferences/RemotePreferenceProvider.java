@@ -201,7 +201,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        String prefName = getPreferencesName(sharedPreferences);
+        String prefName = getPreferenceName(sharedPreferences);
         Uri uri = mBaseUri.buildUpon().appendPath(prefName).appendPath(key).build();
         getContext().getContentResolver().notifyChange(uri, null);
     }
@@ -276,7 +276,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return prefs;
     }
 
-    private String getPreferencesName(SharedPreferences preferences) {
+    private String getPreferenceName(SharedPreferences preferences) {
         for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
             if (entry.getValue() == preferences) {
                 return entry.getKey();

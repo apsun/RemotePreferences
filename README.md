@@ -168,6 +168,11 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 ## Changelog
 
+0.5
+
+- Ensure edits are atomic - either all or no edits succeed when committing
+- Minor performance improvement when adding/removing multiple keys
+
 0.4
 
 - Fixed `IllegalArgumentException` being thrown instead of `RemotePreferenceAccessException`
