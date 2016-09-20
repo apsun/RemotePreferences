@@ -160,15 +160,6 @@ public class RemotePreferences implements SharedPreferences {
         return cursor;
     }
 
-    private boolean delete(Uri uri) {
-        try {
-            mContext.getContentResolver().delete(uri, null, null);
-        } catch (Exception e) {
-            return wrapException(e);
-        }
-        return true;
-    }
-
     private boolean bulkInsert(Uri uri, ContentValues[] values) {
         try {
             mContext.getContentResolver().bulkInsert(uri, values);
@@ -255,21 +246,32 @@ public class RemotePreferences implements SharedPreferences {
 
     private class RemotePreferencesEditor implements Editor {
         private final ArrayList<ContentValues> mToAdd = new ArrayList<ContentValues>();
-        private final HashSet<String> mToRemove = new HashSet<String>();
+        private final ArrayList<ContentValues> mToRemove = new ArrayList<ContentValues>();
 
-        private ContentValues add(String key, int type) {
-            checkKeyNotEmpty(key);
+        private ContentValues createContentValues(String key, int type) {
             ContentValues values = new ContentValues(4); // 3 keys / 0.75 resize factor
             values.put(RemoteContract.COLUMN_KEY, key);
             values.put(RemoteContract.COLUMN_TYPE, type);
+            return values;
+        }
+
+        private ContentValues createAddOp(String key, int type) {
+            checkKeyNotEmpty(key);
+            ContentValues values = createContentValues(key, type);
             mToAdd.add(values);
+            return values;
+        }
+
+        private ContentValues createRemoveOp(String key) {
+            ContentValues values = createContentValues(key, RemoteContract.TYPE_NULL);
+            values.putNull(RemoteContract.COLUMN_VALUE);
+            mToRemove.add(values);
             return values;
         }
 
         @Override
         public Editor putString(String key, String value) {
-            add(key, RemoteContract.TYPE_STRING)
-                .put(RemoteContract.COLUMN_VALUE, value);
+            createAddOp(key, RemoteContract.TYPE_STRING).put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
@@ -279,66 +281,61 @@ public class RemotePreferences implements SharedPreferences {
             if (Build.VERSION.SDK_INT < 11) {
                 throw new UnsupportedOperationException("String sets only supported on API 11 and above");
             }
-            add(key, RemoteContract.TYPE_STRING_SET)
-                .put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(value));
+            String serializedSet = RemoteUtils.serializeStringSet(value);
+            createAddOp(key, RemoteContract.TYPE_STRING_SET).put(RemoteContract.COLUMN_VALUE, serializedSet);
             return this;
         }
 
         @Override
         public Editor putInt(String key, int value) {
-            add(key, RemoteContract.TYPE_INT)
-                .put(RemoteContract.COLUMN_VALUE, value);
+            createAddOp(key, RemoteContract.TYPE_INT).put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putLong(String key, long value) {
-            add(key, RemoteContract.TYPE_LONG)
-                .put(RemoteContract.COLUMN_VALUE, value);
+            createAddOp(key, RemoteContract.TYPE_LONG).put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putFloat(String key, float value) {
-            add(key, RemoteContract.TYPE_FLOAT)
-                .put(RemoteContract.COLUMN_VALUE, value);
+            createAddOp(key, RemoteContract.TYPE_FLOAT).put(RemoteContract.COLUMN_VALUE, value);
             return this;
         }
 
         @Override
         public Editor putBoolean(String key, boolean value) {
-            add(key, RemoteContract.TYPE_BOOLEAN)
-                .put(RemoteContract.COLUMN_VALUE, value ? 1 : 0);
+            createAddOp(key, RemoteContract.TYPE_BOOLEAN).put(RemoteContract.COLUMN_VALUE, value ? 1 : 0);
             return this;
         }
 
         @Override
         public Editor remove(String key) {
             checkKeyNotEmpty(key);
-            mToRemove.add(key);
+            createRemoveOp(key);
             return this;
         }
 
         @Override
         public Editor clear() {
-            mToRemove.add("");
+            createRemoveOp("");
             return this;
         }
 
         @Override
         public boolean commit() {
-            // WARNING: This method may corrupt preference state if any
-            // but the first operation fails. There is no good solution
-            // to this (applyBatch doesn't provide a sufficient API), so
-            // we'll just have to pray that all exceptions are thrown on
-            // the first access.
-            for (String key : mToRemove) {
-                Uri uri = mBaseUri.buildUpon().appendPath(key).build();
-                if (!delete(uri)) {
-                    return false;
-                }
+            ContentValues[] values = new ContentValues[mToRemove.size() + mToAdd.size()];
+            if (mToRemove.isEmpty()) {
+                values = mToAdd.toArray(values);
+            } else if (mToAdd.isEmpty()) {
+                values = mToRemove.toArray(values);
+            } else {
+                ArrayList<ContentValues> merged = new ArrayList<ContentValues>(values.length);
+                merged.addAll(mToRemove);
+                merged.addAll(mToAdd);
+                values = merged.toArray(values);
             }
-            ContentValues[] values = mToAdd.toArray(new ContentValues[mToAdd.size()]);
             Uri uri = mBaseUri.buildUpon().appendPath("").build();
             return bulkInsert(uri, values);
         }

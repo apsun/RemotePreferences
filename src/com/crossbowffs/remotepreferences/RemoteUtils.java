@@ -20,7 +20,7 @@ import java.util.Set;
         throw new AssertionError("Unknown preference type: " + value.getClass());
     }
 
-    public static Object serialize(Object value) {
+    public static Object serializeOutput(Object value) {
         if (value instanceof Boolean) {
             return serializeBoolean((Boolean)value);
         } else if (value instanceof Set<?>) {
@@ -31,7 +31,14 @@ import java.util.Set;
     }
 
     @SuppressWarnings("RedundantCast")
-    public static Object deserialize(Object value, int expectedType) {
+    public static Object deserializeInput(Object value, int expectedType) {
+        if (expectedType == RemoteContract.TYPE_NULL) {
+            if (value != null) {
+                throw new IllegalArgumentException("Expected null, got non-null value");
+            } else {
+                return null;
+            }
+        }
         try {
             switch (expectedType) {
             case RemoteContract.TYPE_STRING:
@@ -46,12 +53,11 @@ import java.util.Set;
                 return (Float)value;
             case RemoteContract.TYPE_BOOLEAN:
                 return deserializeBoolean(value);
-            default:
-                throw new IllegalArgumentException("Unknown type: " + expectedType);
             }
         } catch (ClassCastException e) {
             throw new IllegalArgumentException("Expected type " + expectedType + ", got " + value.getClass(), e);
         }
+        throw new IllegalArgumentException("Unknown type: " + expectedType);
     }
 
     public static Integer serializeBoolean(Boolean value) {
