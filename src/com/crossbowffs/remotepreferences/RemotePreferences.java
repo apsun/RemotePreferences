@@ -127,13 +127,13 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
-    private void checkNotNull(String name, Object object) {
+    private static void checkNotNull(String name, Object object) {
         if (object == null) {
             throw new IllegalArgumentException(name + " is null");
         }
     }
 
-    private void checkKeyNotEmpty(String key) {
+    private static void checkKeyNotEmpty(String key) {
         if (key == null || key.length() == 0) {
             throw new IllegalArgumentException("Key is null or empty");
         }
@@ -325,6 +325,8 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public boolean commit() {
+            // Merge the removals and additions, with removals
+            // first (this is how SharedPreferences does it)
             ContentValues[] values = new ContentValues[mToRemove.size() + mToAdd.size()];
             if (mToRemove.isEmpty()) {
                 values = mToAdd.toArray(values);

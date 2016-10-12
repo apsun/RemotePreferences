@@ -6,6 +6,9 @@ import java.util.Set;
 /* package */ class RemoteUtils {
     @SuppressWarnings("unchecked")
     public static Set<String> castStringSet(Object value) {
+        // This is just to centralize the unchecked type cast warning.
+        // Since all sets we are dealing with are string sets, this
+        // cast should always work as expected.
         return (Set<String>)value;
     }
 
