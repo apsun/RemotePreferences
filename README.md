@@ -54,11 +54,18 @@ picked earlier and the name of the preference file:
 
 ```Java
 SharedPreferences prefs = new RemotePreferences(context, "com.example.app.preferences", "main_prefs");
+int intValue = prefs.getInt("my_int_pref", 0);
 ```
+
+**WARNING**: **DO NOT** use `RemotePreferences` from within `IXposedHookZygoteInit.initZygote`,
+since app providers have not been initialized at this point. Instead,
+defer preference loading to `IXposedHookLoadPackage.handleLoadPackage`.
 
 Note that you should still use `context.getSharedPreferences("main_prefs", MODE_PRIVATE)`
 if your code is executing within the app that owns the preferences. Only use
 `RemotePreferences` when accessing preferences from the context of another app.
+
+Also note that your preference key cannot be `null` or `""` (empty string).
 
 
 ## Security
@@ -131,12 +138,6 @@ try {
     // Handle the error
 }
 ```
-
-
-## Compatibility
-
-`RemotePreferences` is fully compatible with the `SharedPreferences`
-API, with the exception that **keys cannot be empty** (`null` or `""`).
 
 
 ## Why would I need this?
