@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.4'
+    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.5'
 }
 ```
 
