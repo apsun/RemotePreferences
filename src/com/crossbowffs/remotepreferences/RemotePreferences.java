@@ -139,11 +139,9 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
-    private boolean wrapException(Exception e) {
+    private void wrapException(Exception e) {
         if (mStrictMode) {
             throw new RemotePreferenceAccessException(e);
-        } else {
-            return false;
         }
     }
 
@@ -164,7 +162,8 @@ public class RemotePreferences implements SharedPreferences {
         try {
             mContext.getContentResolver().bulkInsert(uri, values);
         } catch (Exception e) {
-            return wrapException(e);
+            wrapException(e);
+            return false;
         }
         return true;
     }

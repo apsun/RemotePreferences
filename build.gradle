@@ -6,8 +6,8 @@ buildscript {
 
     dependencies {
         classpath "com.android.tools.build:gradle:2.2.0"
-        classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7"
-        classpath "com.github.dcendents:android-maven-gradle-plugin:1.4.1"
+        classpath "com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3"
+        classpath "com.github.dcendents:android-maven-gradle-plugin:1.5"
     }
 }
 
@@ -20,7 +20,7 @@ version = "0.5"
 
 android {
     compileSdkVersion 24
-    buildToolsVersion "24.0.2"
+    buildToolsVersion "25.0.0"
 
     defaultConfig {
         minSdkVersion 1
