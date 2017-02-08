@@ -20,9 +20,9 @@ dependencies {
 }
 ```
 
-2\. Subclass `RemotePreferenceProvider` and implement a default
+2\. Subclass `RemotePreferenceProvider` and implement a 0-argument
 constructor which calls the super constructor with an authority
-(pick one, e.g. `"com.example.app.preferences"`) and an array of
+(e.g. `"com.example.app.preferences"`) and an array of
 preference files to expose:
 
 ```Java
@@ -33,13 +33,9 @@ public class MyPreferenceProvider extends RemotePreferenceProvider {
 }
 ```
 
-If you use `PreferenceManager#getDefaultSharedPreferences`, the
-preference file name is your package name + `_preferences`, e.g.
-`com.example.app_preferences`.
-
 3\. Add the corresponding entry to `AndroidManifest.xml`, with
-`android:authorities` equal to the value you picked in the last step,
-and `android:exported` set to `true`:
+`android:authorities` equal to the authority you picked in the
+last step, and `android:exported` set to `true`:
 
 ```XML
 <provider
@@ -49,23 +45,24 @@ and `android:exported` set to `true`:
 ```
 
 4\. You're all set! To access your preferences, create a new
-instance of `RemotePreferences` with the authority value you
-picked earlier and the name of the preference file:
+instance of `RemotePreferences` with the same authority and the
+name of the preference file:
 
 ```Java
 SharedPreferences prefs = new RemotePreferences(context, "com.example.app.preferences", "main_prefs");
 int intValue = prefs.getInt("my_int_pref", 0);
 ```
 
-**WARNING**: **DO NOT** use `RemotePreferences` from within `IXposedHookZygoteInit.initZygote`,
-since app providers have not been initialized at this point. Instead,
-defer preference loading to `IXposedHookLoadPackage.handleLoadPackage`.
+**WARNING**: **DO NOT** use `RemotePreferences` from within
+`IXposedHookZygoteInit.initZygote`, since app providers have not been
+initialized at this point. Instead, defer preference loading to
+`IXposedHookLoadPackage.handleLoadPackage`.
 
 Note that you should still use `context.getSharedPreferences("main_prefs", MODE_PRIVATE)`
 if your code is executing within the app that owns the preferences. Only use
 `RemotePreferences` when accessing preferences from the context of another app.
 
-Also note that your preference key cannot be `null` or `""` (empty string).
+Also note that your preference keys cannot be `null` or `""` (empty string).
 
 
 ## Security

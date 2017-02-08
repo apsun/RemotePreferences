@@ -159,13 +159,14 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     private boolean bulkInsert(Uri uri, ContentValues[] values) {
+        int count;
         try {
-            mContext.getContentResolver().bulkInsert(uri, values);
+            count = mContext.getContentResolver().bulkInsert(uri, values);
         } catch (Exception e) {
             wrapException(e);
             return false;
         }
-        return true;
+        return count == values.length;
     }
 
     private Object querySingle(String key, Object defValue, int expectedType) {
@@ -174,13 +175,20 @@ public class RemotePreferences implements SharedPreferences {
         String[] columns = {RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
         Cursor cursor = query(uri, columns);
         try {
-            if (cursor == null || !cursor.moveToFirst() || cursor.getInt(0) == RemoteContract.TYPE_NULL) {
+            if (cursor == null || !cursor.moveToFirst()) {
                 return defValue;
-            } else if (cursor.getInt(0) != expectedType) {
-                throw new ClassCastException("Preference type mismatch");
-            } else {
-                return getValue(cursor, 0, 1);
             }
+
+            int typeCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_TYPE);
+            int type = cursor.getInt(typeCol);
+            if (type == RemoteContract.TYPE_NULL) {
+                return defValue;
+            } else if (type != expectedType) {
+                throw new ClassCastException("Preference type mismatch");
+            }
+
+            int valueCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_VALUE);
+            return getValue(cursor, typeCol, valueCol);
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -197,9 +205,13 @@ public class RemotePreferences implements SharedPreferences {
             if (cursor == null) {
                 return map;
             }
+
+            int keyCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_KEY);
+            int typeCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_TYPE);
+            int valueCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_VALUE);
             while (cursor.moveToNext()) {
-                String name = cursor.getString(0);
-                map.put(name, getValue(cursor, 1, 2));
+                String key = cursor.getString(keyCol);
+                map.put(key, getValue(cursor, typeCol, valueCol));
             }
             return map;
         } finally {
@@ -215,7 +227,12 @@ public class RemotePreferences implements SharedPreferences {
         String[] columns = {RemoteContract.COLUMN_TYPE};
         Cursor cursor = query(uri, columns);
         try {
-            return (cursor != null && cursor.moveToFirst() && cursor.getInt(0) != RemoteContract.TYPE_NULL);
+            if (cursor == null || !cursor.moveToFirst()) {
+                return false;
+            }
+
+            int typeCol = cursor.getColumnIndexOrThrow(RemoteContract.COLUMN_TYPE);
+            return cursor.getInt(typeCol) != RemoteContract.TYPE_NULL;
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -244,11 +261,10 @@ public class RemotePreferences implements SharedPreferences {
     }
 
     private class RemotePreferencesEditor implements Editor {
-        private final ArrayList<ContentValues> mToAdd = new ArrayList<ContentValues>();
-        private final ArrayList<ContentValues> mToRemove = new ArrayList<ContentValues>();
+        private final ArrayList<ContentValues> mValues = new ArrayList<ContentValues>();
 
         private ContentValues createContentValues(String key, int type) {
-            ContentValues values = new ContentValues(4); // 3 keys / 0.75 resize factor
+            ContentValues values = new ContentValues(4);
             values.put(RemoteContract.COLUMN_KEY, key);
             values.put(RemoteContract.COLUMN_TYPE, type);
             return values;
@@ -257,14 +273,17 @@ public class RemotePreferences implements SharedPreferences {
         private ContentValues createAddOp(String key, int type) {
             checkKeyNotEmpty(key);
             ContentValues values = createContentValues(key, type);
-            mToAdd.add(values);
+            mValues.add(values);
             return values;
         }
 
         private ContentValues createRemoveOp(String key) {
+            // Note: Remove operations are inserted at the beginning
+            // of the list (this preserves the SharedPreferences behavior
+            // that all removes are performed before any adds)
             ContentValues values = createContentValues(key, RemoteContract.TYPE_NULL);
             values.putNull(RemoteContract.COLUMN_VALUE);
-            mToRemove.add(values);
+            mValues.add(0, values);
             return values;
         }
 
@@ -324,19 +343,7 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public boolean commit() {
-            // Merge the removals and additions, with removals
-            // first (this is how SharedPreferences does it)
-            ContentValues[] values = new ContentValues[mToRemove.size() + mToAdd.size()];
-            if (mToRemove.isEmpty()) {
-                values = mToAdd.toArray(values);
-            } else if (mToAdd.isEmpty()) {
-                values = mToRemove.toArray(values);
-            } else {
-                ArrayList<ContentValues> merged = new ArrayList<ContentValues>(values.length);
-                merged.addAll(mToRemove);
-                merged.addAll(mToAdd);
-                values = merged.toArray(values);
-            }
+            ContentValues[] values = mValues.toArray(new ContentValues[mValues.size()]);
             Uri uri = mBaseUri.buildUpon().appendPath("").build();
             return bulkInsert(uri, values);
         }
@@ -363,6 +370,11 @@ public class RemotePreferences implements SharedPreferences {
         @Override
         public void onChange(boolean selfChange, Uri uri) {
             String prefKey = uri.getLastPathSegment();
+
+            // We use a weak reference to mimic the behavior of SharedPreferences.
+            // The code which registered the listener is responsible for holding a
+            // reference to it. If at any point we find that the listener has been
+            // garbage collected, we unregister the observer.
             OnSharedPreferenceChangeListener listener = mListener.get();
             if (listener == null) {
                 mContext.getContentResolver().unregisterContentObserver(this);

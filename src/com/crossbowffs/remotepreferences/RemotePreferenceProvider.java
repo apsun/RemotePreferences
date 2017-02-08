@@ -53,14 +53,33 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         mUriMatcher.addURI(authority, "*/*", PREFERENCE_ID);
     }
 
+    /**
+     * Checks whether a specific preference is accessible by clients.
+     * The default implementation returns {@code true} for all accesses.
+     * You may override this method to control which preferences can be
+     * read or written.
+     *
+     * @param prefName The name of the preference file.
+     * @param prefKey The preference key. This is an empty string when handling the
+     *                {@link SharedPreferences#getAll()} and
+     *                {@link SharedPreferences.Editor#clear()} operations.
+     * @param write {@code true} for put/remove/clear operations; {@code false} for get operations.
+     * @return {@code true} if the access is allowed; {@code false} otherwise.
+     */
+    protected boolean checkAccess(String prefName, String prefKey, boolean write) {
+        return true;
+    }
+
     @Override
-    @SuppressWarnings("ConstantConditions")
     public boolean onCreate() {
+        // We register the shared preference listener whenever the provider
+        // is created. This method is called before almost all other code in
+        // the app, which ensures that we never miss a preference change.
         Context context = getContext();
         for (String prefName : mPrefNames) {
-            SharedPreferences preferences = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
-            preferences.registerOnSharedPreferenceChangeListener(this);
-            mPreferences.put(prefName, preferences);
+            SharedPreferences prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            prefs.registerOnSharedPreferenceChangeListener(this);
+            mPreferences.put(prefName, prefs);
         }
         return true;
     }
@@ -68,24 +87,31 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
-        checkAccessOrThrow(nameKeyPair.name, nameKeyPair.key, false);
-        SharedPreferences preferences = getPreferencesByName(nameKeyPair.name);
-        Map<String, ?> preferenceMap = preferences.getAll();
+        String prefName = nameKeyPair.name;
+        String rawPrefKey = nameKeyPair.key;
+
+        SharedPreferences prefs = getPreferencesOrThrow(prefName, rawPrefKey, false);
+        Map<String, ?> prefMap = prefs.getAll();
+
+        // If no projection is specified, we return all columns.
         if (projection == null) {
             projection = RemoteContract.COLUMN_ALL;
         }
+
+        // Fill out the cursor with the preference data. If the caller
+        // didn't ask for a particular preference, we return all of them.
         MatrixCursor cursor = new MatrixCursor(projection);
-        if (nameKeyPair.key.length() == 0) {
-            for (Map.Entry<String, ?> entry : preferenceMap.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-                cursor.addRow(buildRow(projection, key, value));
-            }
+        if (isSingleKey(rawPrefKey)) {
+            Object prefValue = prefMap.get(rawPrefKey);
+            cursor.addRow(buildRow(projection, rawPrefKey, prefValue));
         } else {
-            String key = nameKeyPair.key;
-            Object value = preferenceMap.get(key);
-            cursor.addRow(buildRow(projection, key, value));
+            for (Map.Entry<String, ?> entry : prefMap.entrySet()) {
+                String prefKey = entry.getKey();
+                Object prefValue = entry.getValue();
+                cursor.addRow(buildRow(projection, prefKey, prefValue));
+            }
         }
+
         return cursor;
     }
 
@@ -99,105 +125,97 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         if (values == null) {
             return null;
         }
+
         PrefNameKeyPair nameKeyPair = parseUri(uri);
-        String key = getKeyFromUriOrValues(nameKeyPair, values);
-        checkAccessOrThrow(nameKeyPair.name, key, true);
-        SharedPreferences.Editor editor = getPreferencesByName(nameKeyPair.name).edit();
-        putPreference(editor, key, values);
-        editor.commit();
-        return null;
+        String prefName = nameKeyPair.name;
+        String prefKey = getKeyFromUriOrValues(nameKeyPair, values);
+
+        SharedPreferences prefs = getPreferencesOrThrow(prefName, prefKey, true);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        putPreference(editor, prefKey, values);
+
+        if (editor.commit()) {
+            return getPreferenceUri(prefName, prefKey);
+        } else {
+            return null;
+        }
     }
 
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
-        if (nameKeyPair.key.length() != 0) {
+        String prefName = nameKeyPair.name;
+        if (isSingleKey(nameKeyPair.key)) {
             throw new IllegalArgumentException("Cannot bulk insert with single key URI");
         }
-        SharedPreferences.Editor editor = getPreferencesByName(nameKeyPair.name).edit();
+
+        SharedPreferences prefs = getPreferencesByName(prefName);
+        SharedPreferences.Editor editor = prefs.edit();
+
         for (ContentValues value : values) {
-            String key = getKeyFromValues(value);
-            checkAccessOrThrow(nameKeyPair.name, key, true);
-            putPreference(editor, key, value);
+            String prefKey = getKeyFromValues(value);
+            checkAccessOrThrow(prefName, prefKey, true);
+            putPreference(editor, prefKey, value);
         }
-        editor.commit();
-        return values.length;
+
+        if (editor.commit()) {
+            return values.length;
+        } else {
+            return 0;
+        }
     }
 
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
-        checkAccessOrThrow(nameKeyPair.name, nameKeyPair.key, true);
-        SharedPreferences preferences = getPreferencesByName(nameKeyPair.name);
-        if (nameKeyPair.key.length() == 0) {
-            preferences.edit().clear().commit();
+        String prefName = nameKeyPair.name;
+        String prefKey = nameKeyPair.key;
+
+        SharedPreferences prefs = getPreferencesOrThrow(prefName, prefKey, true);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        int count;
+        if (isSingleKey(prefKey)) {
+            count = 1;
+            editor.remove(prefKey);
         } else {
-            preferences.edit().remove(nameKeyPair.key).commit();
+            count = prefs.getAll().size();
+            editor.clear();
         }
-        return 0;
+
+        if (editor.commit()) {
+            return count;
+        } else {
+            return 0;
+        }
     }
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         if (values == null) {
-            delete(uri, selection, selectionArgs);
+            return delete(uri, selection, selectionArgs);
         } else {
-            insert(uri, values);
+            return insert(uri, values) != null ? 1 : 0;
         }
-        return 0;
     }
 
     @Override
-    @SuppressWarnings("ConstantConditions")
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        String prefName = getPreferenceName(sharedPreferences);
-        Uri uri = mBaseUri.buildUpon().appendPath(prefName).appendPath(key).build();
-        getContext().getContentResolver().notifyChange(uri, null);
-    }
-
-    private PrefNameKeyPair parseUri(Uri uri) {
-        int match = mUriMatcher.match(uri);
-        if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
-            throw new IllegalArgumentException("Invalid URI: " + uri);
-        }
-        List<String> pathSegments = uri.getPathSegments();
-        String prefName = pathSegments.get(0);
-        String prefKey = "";
-        if (match == PREFERENCE_ID) {
-            prefKey = pathSegments.get(1);
-        }
-        return new PrefNameKeyPair(prefName, prefKey);
-    }
-
-    private String getKeyFromValues(ContentValues values) {
-        String key = values.getAsString(RemoteContract.COLUMN_KEY);
-        if (key == null) {
-            key = "";
-        }
-        return key;
-    }
-
-    private String getKeyFromUriOrValues(PrefNameKeyPair nameKeyPair, ContentValues values) {
-        String uriKey = nameKeyPair.key;
-        String valuesKey = getKeyFromValues(values);
-        if (uriKey.length() != 0 && valuesKey.length() != 0) {
-            // If a key is specified in both the URI and ContentValues,
-            // they must match
-            if (!uriKey.equals(valuesKey)) {
-                throw new IllegalArgumentException("Conflicting keys specified in URI and ContentValues");
+    public void onSharedPreferenceChanged(SharedPreferences prefs, String prefKey) {
+        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
+            if (entry.getValue() == prefs) {
+                String prefName = entry.getKey();
+                Uri uri = getPreferenceUri(prefName, prefKey);
+                getContext().getContentResolver().notifyChange(uri, null);
+                return;
             }
-            return uriKey;
-        } else if (uriKey.length() != 0) {
-            return uriKey;
-        } else if (valuesKey.length() != 0) {
-            return valuesKey;
-        } else {
-            return "";
         }
     }
 
     @SuppressWarnings("ConstantConditions")
-    private void putPreference(SharedPreferences.Editor editor, String key, ContentValues values) {
+    private void putPreference(SharedPreferences.Editor editor, String prefKey, ContentValues values) {
+        // Get the new value type. Note that we manually check
+        // for null, then unbox the Integer so we don't cause a NPE.
         Integer type = values.getAsInteger(RemoteContract.COLUMN_TYPE);
         if (type == null) {
             throw new IllegalArgumentException("Invalid or no preference type specified");
@@ -209,9 +227,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         Object rawValue = values.get(RemoteContract.COLUMN_VALUE);
         Object value = RemoteUtils.deserializeInput(rawValue, type);
 
-        // Null keys are normalized to empty strings, so this checks both
-        // null and empty cases.
-        if (key.length() == 0) {
+        // If we are writing to the "directory" and the type is null,
+        // then we should clear the preferences.
+        if (!isSingleKey(prefKey)) {
             if (type == RemoteContract.TYPE_NULL) {
                 editor.clear();
                 return;
@@ -222,29 +240,29 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
         switch (type) {
         case RemoteContract.TYPE_NULL:
-            editor.remove(key);
+            editor.remove(prefKey);
             break;
         case RemoteContract.TYPE_STRING:
-            editor.putString(key, (String)value);
+            editor.putString(prefKey, (String)value);
             break;
         case RemoteContract.TYPE_STRING_SET:
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                editor.putStringSet(key, RemoteUtils.castStringSet(value));
+            if (Build.VERSION.SDK_INT >= 11) {
+                editor.putStringSet(prefKey, RemoteUtils.castStringSet(value));
             } else {
                 throw new IllegalArgumentException("String set preferences not supported on API < 11");
             }
             break;
         case RemoteContract.TYPE_INT:
-            editor.putInt(key, (Integer)value);
+            editor.putInt(prefKey, (Integer)value);
             break;
         case RemoteContract.TYPE_LONG:
-            editor.putLong(key, (Long)value);
+            editor.putLong(prefKey, (Long)value);
             break;
         case RemoteContract.TYPE_FLOAT:
-            editor.putFloat(key, (Float)value);
+            editor.putFloat(prefKey, (Float)value);
             break;
         case RemoteContract.TYPE_BOOLEAN:
-            editor.putBoolean(key, (Boolean)value);
+            editor.putBoolean(prefKey, (Boolean)value);
             break;
         default:
             throw new IllegalArgumentException("Cannot set preference with type " + type);
@@ -268,6 +286,51 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return row;
     }
 
+    private PrefNameKeyPair parseUri(Uri uri) {
+        int match = mUriMatcher.match(uri);
+        if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
+            throw new IllegalArgumentException("Invalid URI: " + uri);
+        }
+        List<String> pathSegments = uri.getPathSegments();
+        String prefName = pathSegments.get(0);
+        String prefKey = "";
+        if (match == PREFERENCE_ID) {
+            prefKey = pathSegments.get(1);
+        }
+        return new PrefNameKeyPair(prefName, prefKey);
+    }
+
+    private static boolean isSingleKey(String prefKey) {
+        return prefKey != null && prefKey.length() != 0;
+    }
+
+    private static String getKeyFromValues(ContentValues values) {
+        String key = values.getAsString(RemoteContract.COLUMN_KEY);
+        if (key == null) {
+            key = "";
+        }
+        return key;
+    }
+
+    private static String getKeyFromUriOrValues(PrefNameKeyPair nameKeyPair, ContentValues values) {
+        String uriKey = nameKeyPair.key;
+        String valuesKey = getKeyFromValues(values);
+        if (uriKey.length() != 0 && valuesKey.length() != 0) {
+            // If a key is specified in both the URI and
+            // ContentValues, they must match
+            if (!uriKey.equals(valuesKey)) {
+                throw new IllegalArgumentException("Conflicting keys specified in URI and ContentValues");
+            }
+            return uriKey;
+        } else if (uriKey.length() != 0) {
+            return uriKey;
+        } else if (valuesKey.length() != 0) {
+            return valuesKey;
+        } else {
+            return "";
+        }
+    }
+
     private void checkAccessOrThrow(String prefName, String prefKey, boolean write) {
         if (!checkAccess(prefName, prefKey, write)) {
             throw new SecurityException("Insufficient permissions to access: " + prefName + "/" + prefKey);
@@ -282,30 +345,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return prefs;
     }
 
-    private String getPreferenceName(SharedPreferences preferences) {
-        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
-            if (entry.getValue() == preferences) {
-                return entry.getKey();
-            }
-        }
-        throw new AssertionError("Cannot find name for SharedPreferences");
+    private SharedPreferences getPreferencesOrThrow(String prefName, String prefKey, boolean write) {
+        checkAccessOrThrow(prefName, prefKey, write);
+        return getPreferencesByName(prefName);
     }
 
-    /**
-     * Checks whether a specific preference is accessible by clients.
-     * The default implementation returns {@code true} for all accesses.
-     * You may override this method to control which preferences can be
-     * read or written.
-     *
-     * @param prefName The name of the preference file.
-     * @param prefKey The preference key. This is an empty string when handling the
-     *                {@link SharedPreferences#getAll()} and
-     *                {@link SharedPreferences.Editor#clear()} operations.
-     * @param write {@code true} for "put" operations; {@code false} for "get" operations.
-     * @return {@code true} if the access is allowed; {@code false} otherwise.
-     */
-    protected boolean checkAccess(String prefName, String prefKey, boolean write) {
-        return true;
+    private Uri getPreferenceUri(String prefName, String prefKey) {
+        return mBaseUri.buildUpon().appendPath(prefName).appendPath(prefKey).build();
     }
 
     private class PrefNameKeyPair {
