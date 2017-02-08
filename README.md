@@ -166,6 +166,10 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 ## Changelog
 
+0.6
+- Improved error checking
+- ???
+
 0.5
 
 - Ensure edits are atomic - either all or no edits succeed when committing

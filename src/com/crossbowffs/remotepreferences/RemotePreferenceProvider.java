@@ -291,6 +291,16 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
             throw new IllegalArgumentException("Invalid URI: " + uri);
         }
+
+        // The URI must fall under one of these patterns:
+        //
+        //   content://authority/prefName/prefKey
+        //   content://authority/prefName/
+        //   content://authority/prefName
+        //
+        // The match ID will be PREFERENCE_ID under the first case,
+        // and PREFERENCES_ID under the second and third cases
+        // (UriMatcher ignores trailing slashes).
         List<String> pathSegments = uri.getPathSegments();
         String prefName = pathSegments.get(0);
         String prefKey = "";
