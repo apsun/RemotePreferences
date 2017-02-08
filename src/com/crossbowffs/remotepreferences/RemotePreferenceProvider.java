@@ -175,17 +175,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         SharedPreferences prefs = getPreferencesOrThrow(prefName, prefKey, true);
         SharedPreferences.Editor editor = prefs.edit();
 
-        int count;
         if (isSingleKey(prefKey)) {
-            count = 1;
             editor.remove(prefKey);
         } else {
-            count = prefs.getAll().size();
             editor.clear();
         }
 
+        // There's no reliable method of getting the actual number of
+        // preference values changed, so callers should not rely on this
+        // value. A return value of 1 means success, 0 means failure.
         if (editor.commit()) {
-            return count;
+            return 1;
         } else {
             return 0;
         }
@@ -351,7 +351,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     }
 
     private Uri getPreferenceUri(String prefName, String prefKey) {
-        return mBaseUri.buildUpon().appendPath(prefName).appendPath(prefKey).build();
+        Uri.Builder builder = mBaseUri.buildUpon().appendPath(prefName);
+        if (isSingleKey(prefKey)) {
+            builder.appendPath(prefKey);
+        }
+        return builder.build();
     }
 
     private class PrefNameKeyPair {
