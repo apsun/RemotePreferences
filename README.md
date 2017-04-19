@@ -140,10 +140,9 @@ try {
 ## Why would I need this?
 
 This library was developed to simplify Xposed module preference access.
-`XSharedPreferences` [has been known to silently fail on some devices]
-(https://github.com/rovo89/XposedBridge/issues/74), and does not support
-remote write access or value changed listeners. And thus, RemotePreferences
-was born.
+`XSharedPreferences` [has been known to silently fail on some devices](https://github.com/rovo89/XposedBridge/issues/74),
+and does not support remote write access or value changed listeners.
+Thus, RemotePreferences was born.
 
 Of course, feel free to use this library anywhere you like; it's not
 limited to Xposed at all! :-)
