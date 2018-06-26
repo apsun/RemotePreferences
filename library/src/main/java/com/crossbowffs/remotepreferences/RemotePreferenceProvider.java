@@ -368,7 +368,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return builder.build();
     }
 
-    private class PrefNameKeyPair {
+    private static class PrefNameKeyPair {
         private final String name;
         private final String key;
 
