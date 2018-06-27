@@ -1,6 +1,7 @@
 package com.crossbowffs.remotepreferences;
 
 import android.content.*;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
@@ -11,19 +12,55 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * <p>
  * Exposes {@link SharedPreferences} to other apps running on the device.
+ * </p>
  *
- * You must extend this class and declare a default constructor which
+ * <p>
+ * You must extend this class and declare a 0-argument constructor which
  * calls the super constructor with the appropriate authority and
  * preference file name parameters. Remember to add your provider to
- * your AndroidManifest.xml file and set the {@code android:exported}
+ * your {@code AndroidManifest.xml} file and set the {@code android:exported}
  * property to true.
+ * </p>
  *
- * To access the data from a remote process, use {@link RemotePreferences}
- * initialized with the same authority and the desired preference file name.
- *
+ * <p>
  * For granular access control, override {@link #checkAccess(String, String, boolean)}
  * and return {@code false} to deny the operation.
+ * </p>
+ *
+ * <p>
+ * To access the data from a remote process, use {@link RemotePreferences}
+ * initialized with the same authority and the desired preference file name.
+ * You may also manually query the provider; here are some example queries
+ * and their equivalent {@link SharedPreferences} API calls:
+ * </p>
+ *
+ * <pre>
+ * query(uri = content://authority/foo/bar)
+ * = getSharedPreferences("foo").get("bar")
+ *
+ * query(uri = content://authority/foo)
+ * = getSharedPreferences("foo").getAll()
+ *
+ * insert(uri = content://authority/foo/bar, values={type=TYPE_STRING, value="baz"})
+ * = getSharedPreferences("foo").edit().putString("bar", "baz").commit()
+ *
+ * delete(uri = content://authority/foo/bar)
+ * = getSharedPreferences("foo").edit().remove("bar").commit()
+ *
+ * delete(uri = content://authority/foo)
+ * = getSharedPreferences("foo").edit().clear().commit()
+ * </pre>
+ *
+ * <p>
+ * Also note that if you are querying string sets, they will be returned
+ * in a serialized form: {@code ["foo;bar", "baz"]} is converted to
+ * {@code "foo\\;bar;baz;"} (note the trailing semicolon). Booleans are
+ * converted into integers: 1 for true, 0 for false. This is only applicable
+ * if you are using raw queries; all of these subtleties are transparently
+ * handled by {@link RemotePreferences}.
+ * </p>
  */
 public abstract class RemotePreferenceProvider extends ContentProvider implements SharedPreferences.OnSharedPreferenceChangeListener {
     private static final int PREFERENCES_ID = 1;
@@ -54,10 +91,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     }
 
     /**
-     * Checks whether a specific preference is accessible by clients.
+     * Checks whether the specified preference is accessible by callers.
      * The default implementation returns {@code true} for all accesses.
      * You may override this method to control which preferences can be
-     * read or written.
+     * read or written. Note that {@code prefKey} will be {@code ""} when
+     * accessing an entire file, so a whitelist is strongly recommended
+     * over a blacklist (your default case should be {@code return false},
+     * not {@code return true}).
      *
      * @param prefName The name of the preference file.
      * @param prefKey The preference key. This is an empty string when handling the
@@ -70,6 +110,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return true;
     }
 
+    /**
+     * Called at application startup to register preference change listeners.
+     *
+     * @return Always returns {@code true}.
+     */
     @Override
     public boolean onCreate() {
         // We register the shared preference listener whenever the provider
@@ -84,6 +129,21 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return true;
     }
 
+    /**
+     * Returns a cursor for the specified preference(s). If {@code uri}
+     * is in the form {@code content://authority/prefName/prefKey}, the
+     * cursor will contain a single row containing the queried preference.
+     * If {@code uri} is in the form {@code content://authority/prefName},
+     * the cursor will contain one row for each preference in the specified
+     * file.
+     *
+     * @param uri Specifies the preference file and key (optional) to query.
+     * @param projection Specifies which fields should be returned in the cursor.
+     * @param selection Ignored.
+     * @param selectionArgs Ignored.
+     * @param sortOrder Ignored.
+     * @return A cursor used to access the queried preference data.
+     */
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
@@ -115,11 +175,26 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return cursor;
     }
 
+    /**
+     * Not used in RemotePreferences. Always returns {@code null}.
+     *
+     * @param uri Ignored.
+     * @return Always returns {@code null}.
+     */
     @Override
     public String getType(Uri uri) {
         return null;
     }
 
+    /**
+     * Writes the value of the specified preference(s). If no key is specified,
+     * {@link RemoteContract#COLUMN_TYPE} must be equal to {@link RemoteContract#TYPE_NULL},
+     * representing the {@link SharedPreferences.Editor#clear()} operation.
+     *
+     * @param uri Specifies the preference file and key (optional) to write.
+     * @param values Specifies the key (optional), type and value of the preference to write.
+     * @return A URI representing the preference written, or {@code null} on failure.
+     */
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         if (values == null) {
@@ -142,6 +217,15 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Writes multiple preference values at once. {@code uri} must
+     * be in the form {@code content://authority/prefName}. See
+     * {@link #insert(Uri, ContentValues)} for more information.
+     *
+     * @param uri Specifies the preference file to write to.
+     * @param values See {@link #insert(Uri, ContentValues)}.
+     * @return The number of preferences written, or 0 on failure.
+     */
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
@@ -166,6 +250,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Deletes the specified preference(s). If {@code uri} is in the form
+     * {@code content://authority/prefName/prefKey}, this will only delete
+     * the one preference specified in the URI; if {@code uri} is in the form
+     * {@code content://authority/prefName}, clears all preferences.
+     *
+     * @param uri Specifies the preference file and key (optional) to delete.
+     * @param selection Ignored.
+     * @param selectionArgs Ignored.
+     * @return 1 if the preferences committed successfully, or 0 on failure.
+     */
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         PrefNameKeyPair nameKeyPair = parseUri(uri);
@@ -191,6 +286,18 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Updates the value of the specified preference(s). This is a wrapper
+     * around {@link #insert(Uri, ContentValues)} if {@code values} is not
+     * {@code null}, or {@link #delete(Uri, String, String[])} if {@code values}
+     * is {@code null}.
+     *
+     * @param uri Specifies the preference file and key (optional) to update.
+     * @param values {@code null} to delete the preference,
+     * @param selection Ignored.
+     * @param selectionArgs Ignored.
+     * @return 1 if the preferences committed successfully, or 0 on failure.
+     */
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         if (values == null) {
@@ -200,18 +307,39 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Listener for preference value changes in the local application.
+     * Re-raises the event through the
+     * {@link ContentResolver#notifyChange(Uri, ContentObserver)} API
+     * to any registered {@link ContentObserver} objects. Note that this
+     * is NOT called for {@link SharedPreferences.Editor#clear()}.
+     *
+     * @param prefs The preference file that changed.
+     * @param prefKey The preference key that changed.
+     */
     @Override
     public void onSharedPreferenceChanged(SharedPreferences prefs, String prefKey) {
+        ContentResolver resolver = getContext().getContentResolver();
         for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
             if (entry.getValue() == prefs) {
                 String prefName = entry.getKey();
                 Uri uri = getPreferenceUri(prefName, prefKey);
-                getContext().getContentResolver().notifyChange(uri, null);
+                resolver.notifyChange(uri, null);
                 return;
             }
         }
     }
 
+    /**
+     * Writes the value of the specified preference(s). If {@code prefKey}
+     * is empty, {@code values} must contain {@link RemoteContract#TYPE_NULL}
+     * for the type, representing the {@link SharedPreferences.Editor#clear()}
+     * operation.
+     *
+     * @param editor The preference file to modify.
+     * @param prefKey The preference key to modify, or {@code ""} for the entire file.
+     * @param values The values to write.
+     */
     @SuppressWarnings("ConstantConditions")
     private void putPreference(SharedPreferences.Editor editor, String prefKey, ContentValues values) {
         // Get the new value type. Note that we manually check
@@ -269,6 +397,14 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Used to project a preference value to the schema requested by the caller.
+     *
+     * @param projection The projection requested by the caller.
+     * @param key The preference key.
+     * @param value The preference value.
+     * @return A row representing the preference using the given schema.
+     */
     private Object[] buildRow(String[] projection, String key, Object value) {
         Object[] row = new Object[projection.length];
         for (int i = 0; i < row.length; ++i) {
@@ -286,6 +422,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return row;
     }
 
+    /**
+     * Parses the preference file and key from a query URI. If the key
+     * is not specified, the returned tuple will contain {@code ""} as the key.
+     *
+     * @param uri The URI to parse.
+     * @return A tuple containing the preference file and key.
+     */
     private PrefNameKeyPair parseUri(Uri uri) {
         int match = mUriMatcher.match(uri);
         if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
@@ -310,10 +453,25 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return new PrefNameKeyPair(prefName, prefKey);
     }
 
+    /**
+     * Returns whether the specified key represents a single preference key
+     * (as opposed to the entire preference file).
+     *
+     * @param prefKey The preference key to check.
+     * @return {@code true} if the key refers to a single preference;
+     *         {@code false} otherwise.
+     */
     private static boolean isSingleKey(String prefKey) {
         return prefKey != null && prefKey.length() != 0;
     }
 
+    /**
+     * Parses the preference key from {@code values}. If the key is not
+     * specified in the values, {@code ""} is returned.
+     *
+     * @param values The query values to parse.
+     * @return The parsed key, or {@code ""} if no key was found.
+     */
     private static String getKeyFromValues(ContentValues values) {
         String key = values.getAsString(RemoteContract.COLUMN_KEY);
         if (key == null) {
@@ -322,6 +480,22 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return key;
     }
 
+    /**
+     * Parses the preference key from the specified sources. Since there
+     * are two ways to specify the key (from the URI or from the query values),
+     * the only allowed combinations are:
+     *
+     * uri.key == values.key
+     * uri.key != null && values.key == null = URI key is used
+     * uri.key == null && values.key != null = values key is used
+     * uri.key == null && values.key == null = no key
+     *
+     * If none of these conditions are met, an exception is thrown.
+     *
+     * @param nameKeyPair Parsed URI key from {@link #parseUri(Uri)}.
+     * @param values Query values provided by the caller.
+     * @return The parsed key.
+     */
     private static String getKeyFromUriOrValues(PrefNameKeyPair nameKeyPair, ContentValues values) {
         String uriKey = nameKeyPair.key;
         String valuesKey = getKeyFromValues(values);
@@ -341,12 +515,29 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
     }
 
+    /**
+     * Checks that the caller has permissions to access the specified preference.
+     * Throws an exception if permission is denied.
+     *
+     * @param prefName The preference file to be accessed.
+     * @param prefKey The preference key to be accessed.
+     * @param write Whether the operation will modify the preference.
+     */
     private void checkAccessOrThrow(String prefName, String prefKey, boolean write) {
         if (!checkAccess(prefName, prefKey, write)) {
             throw new SecurityException("Insufficient permissions to access: " + prefName + "/" + prefKey);
         }
     }
 
+    /**
+     * Returns the {@link SharedPreferences} instance with the specified name.
+     * This is essentially equivalent to {@link Context#getSharedPreferences(String, int)},
+     * except that it will used the internally cached version, and throws an
+     * exception if the provider was not configured to access that preference file.
+     *
+     * @param prefName The name of the preference file to access.
+     * @return The {@link SharedPreferences} instance with the specified file name.
+     */
     private SharedPreferences getPreferencesByName(String prefName) {
         SharedPreferences prefs = mPreferences.get(prefName);
         if (prefs == null) {
@@ -355,11 +546,29 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return prefs;
     }
 
+    /**
+     * Returns the {@link SharedPreferences} instance with the specified name,
+     * checking that the caller has permissions to access the specified key within
+     * that file. If not, an exception will be thrown.
+     *
+     * @param prefName The preference file to be accessed.
+     * @param prefKey The preference key to be accessed.
+     * @param write Whether the operation will modify the preference.
+     * @return The {@link SharedPreferences} instance with the specified file name.
+     */
     private SharedPreferences getPreferencesOrThrow(String prefName, String prefKey, boolean write) {
         checkAccessOrThrow(prefName, prefKey, write);
         return getPreferencesByName(prefName);
     }
 
+    /**
+     * Builds a URI for the specified preference file and key that can be used
+     * to later query the same preference.
+     *
+     * @param prefName The preference file.
+     * @param prefKey The preference key.
+     * @return A URI representing the specified preference.
+     */
     private Uri getPreferenceUri(String prefName, String prefKey) {
         Uri.Builder builder = mBaseUri.buildUpon().appendPath(prefName);
         if (isSingleKey(prefKey)) {
@@ -368,6 +577,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         return builder.build();
     }
 
+    /**
+     * Basically just a tuple of (preference file, preference key).
+     */
     private static class PrefNameKeyPair {
         private final String name;
         private final String key;

@@ -1,5 +1,10 @@
 package com.crossbowffs.remotepreferences;
 
+/**
+ * Constants used for communicating with the preference provider.
+ * These are implementation details of the RemotePreferences API,
+ * and should not be used by client code.
+ */
 /* package */ class RemoteContract {
     public static final String COLUMN_KEY = "key";
     public static final String COLUMN_TYPE = "type";

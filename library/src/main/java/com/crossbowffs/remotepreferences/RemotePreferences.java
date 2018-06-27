@@ -14,9 +14,17 @@ import java.lang.ref.WeakReference;
 import java.util.*;
 
 /**
+ * <p>
  * Provides a {@link SharedPreferences} compatible API to
  * {@link RemotePreferenceProvider}. See {@link RemotePreferenceProvider}
  * for more information.
+ * </p>
+ *
+ * <p>
+ * If you are reading preferences from the same context as the
+ * provider, you should not use this class; just access the
+ * {@link SharedPreferences} API as you would normally.
+ * </p>
  */
 public class RemotePreferences implements SharedPreferences {
     private final Context mContext;
@@ -127,24 +135,50 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * If {@code object} is {@code null}, throws an exception.
+     *
+     * @param name The name of the object, for use in the exception message.
+     * @param object The object to check.
+     */
     private static void checkNotNull(String name, Object object) {
         if (object == null) {
             throw new IllegalArgumentException(name + " is null");
         }
     }
 
+    /**
+     * If {@code key} is {@code null} or {@code ""}, throws an exception.
+     *
+     * @param key The object to check.
+     */
     private static void checkKeyNotEmpty(String key) {
         if (key == null || key.length() == 0) {
             throw new IllegalArgumentException("Key is null or empty");
         }
     }
 
+    /**
+     * If strict mode is enabled, wraps and throws the given exception.
+     * Otherwise, does nothing.
+     *
+     * @param e The exception to wrap.
+     */
     private void wrapException(Exception e) {
         if (mStrictMode) {
             throw new RemotePreferenceAccessException(e);
         }
     }
 
+    /**
+     * Queries the specified URI. If the query fails and strict mode is
+     * enabled, an exception will be thrown; otherwise {@code null} will
+     * be returned.
+     *
+     * @param uri The URI to query.
+     * @param columns The columns to include in the returned cursor.
+     * @return A cursor used to access the queried preference data.
+     */
     private Cursor query(Uri uri, String[] columns) {
         Cursor cursor = null;
         try {
@@ -158,6 +192,15 @@ public class RemotePreferences implements SharedPreferences {
         return cursor;
     }
 
+    /**
+     * Writes multiple preferences at once to the preference provider.
+     * If the operation fails and strict mode is enabled, an exception
+     * will be thrown; otherwise {@code false} will be returned.
+     *
+     * @param uri The URI to modify.
+     * @param values The values to write.
+     * @return Whether the operation succeeded.
+     */
     private boolean bulkInsert(Uri uri, ContentValues[] values) {
         int count;
         try {
@@ -166,9 +209,23 @@ public class RemotePreferences implements SharedPreferences {
             wrapException(e);
             return false;
         }
+        if (count != values.length && mStrictMode) {
+            throw new RemotePreferenceAccessException("bulkInsert() failed");
+        }
         return count == values.length;
     }
 
+    /**
+     * Reads a single preference from the preference provider. This may
+     * throw a {@link ClassCastException} even if strict mode is disabled
+     * if the provider returns an incompatible type. If strict mode is
+     * disabled and the preference cannot be read, the default value is returned.
+     *
+     * @param key The preference key to read.
+     * @param defValue The default value, if there is no existing value.
+     * @param expectedType The expected type of the value.
+     * @return The value of the preference, or {@code defValue} if no value exists.
+     */
     private Object querySingle(String key, Object defValue, int expectedType) {
         checkKeyNotEmpty(key);
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
@@ -196,6 +253,13 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * Reads all preferences from the preference provider. If strict
+     * mode is disabled and the preferences cannot be read, an empty
+     * map is returned.
+     *
+     * @return A map containing all preferences.
+     */
     private Map<String, Object> queryAll() {
         Uri uri = mBaseUri.buildUpon().appendPath("").build();
         String[] columns = {RemoteContract.COLUMN_KEY, RemoteContract.COLUMN_TYPE, RemoteContract.COLUMN_VALUE};
@@ -221,6 +285,14 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * Checks whether the preference exists. If strict mode is
+     * disabled and the preferences cannot be read, {@code false}
+     * is returned.
+     *
+     * @param key The key to check existence for.
+     * @return Whether the preference exists.
+     */
     private boolean containsKey(String key) {
         checkKeyNotEmpty(key);
         Uri uri = mBaseUri.buildUpon().appendPath(key).build();
@@ -240,6 +312,15 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * Extracts a preference value from a cursor. Performs deserialization
+     * of the value if necessary.
+     *
+     * @param cursor The cursor containing the preference value.
+     * @param typeCol The index containing the {@link RemoteContract#COLUMN_TYPE} column.
+     * @param valueCol The index containing the {@link RemoteContract#COLUMN_VALUE} column.
+     * @return The value from the cursor.
+     */
     private Object getValue(Cursor cursor, int typeCol, int valueCol) {
         int expectedType = cursor.getInt(typeCol);
         switch (expectedType) {
@@ -260,9 +341,22 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * Implementation of the {@link SharedPreferences.Editor} interface
+     * for use with RemotePreferences.
+     */
     private class RemotePreferencesEditor implements Editor {
         private final ArrayList<ContentValues> mValues = new ArrayList<ContentValues>();
 
+        /**
+         * Creates a new {@link ContentValues} with the specified key and
+         * type columns pre-filled. The {@link RemoteContract#COLUMN_VALUE}
+         * field is NOT filled in.
+         *
+         * @param key The preference key.
+         * @param type The preference type.
+         * @return The pre-filled values.
+         */
         private ContentValues createContentValues(String key, int type) {
             ContentValues values = new ContentValues(4);
             values.put(RemoteContract.COLUMN_KEY, key);
@@ -270,6 +364,15 @@ public class RemotePreferences implements SharedPreferences {
             return values;
         }
 
+        /**
+         * Creates an operation to add/set a new preference. Again, the
+         * {@link RemoteContract#COLUMN_VALUE} field is NOT filled in.
+         * This will also add the values to the operation queue.
+         *
+         * @param key The preference key to add.
+         * @param type The preference type to add.
+         * @return The pre-filled values.
+         */
         private ContentValues createAddOp(String key, int type) {
             checkKeyNotEmpty(key);
             ContentValues values = createContentValues(key, type);
@@ -277,6 +380,14 @@ public class RemotePreferences implements SharedPreferences {
             return values;
         }
 
+        /**
+         * Creates an operation to delete a preference. All fields
+         * are pre-filled. This will also add the values to the
+         * operation queue.
+         *
+         * @param key The preference key to delete.
+         * @return The pre-filled values.
+         */
         private ContentValues createRemoveOp(String key) {
             // Note: Remove operations are inserted at the beginning
             // of the list (this preserves the SharedPreferences behavior
@@ -354,6 +465,11 @@ public class RemotePreferences implements SharedPreferences {
         }
     }
 
+    /**
+     * {@link ContentObserver} subclass used to monitor preference changes
+     * in the remote preference provider. When a change is detected, this will notify
+     * the corresponding {@link SharedPreferences.OnSharedPreferenceChangeListener}.
+     */
     private class PreferenceContentObserver extends ContentObserver {
         private final WeakReference<OnSharedPreferenceChangeListener> mListener;
 

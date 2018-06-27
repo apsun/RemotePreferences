@@ -3,15 +3,31 @@ package com.crossbowffs.remotepreferences;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Common utilities used to serialize and deserialize
+ * preferences between the preference provider and caller.
+ */
 /* package */ class RemoteUtils {
+    /**
+     * Casts the parameter to a string set. Useful to avoid the unchecked
+     * warning that would normally come with the cast. The value must
+     * already be a string set; this does not deserialize it.
+     *
+     * @param value The value, as type {@link Object}.
+     * @return The value, as type {@link Set<String>}.
+     */
     @SuppressWarnings("unchecked")
     public static Set<String> castStringSet(Object value) {
-        // This is just to centralize the unchecked type cast warning.
-        // Since all sets we are dealing with are string sets, this
-        // cast should always work as expected.
         return (Set<String>)value;
     }
 
+    /**
+     * Returns the {@code TYPE_*} constant corresponding to the given
+     * object's type.
+     *
+     * @param value The original object.
+     * @return One of the {@link RemoteContract}{@code .TYPE_*} constants.
+     */
     public static int getPreferenceType(Object value) {
         if (value == null) return RemoteContract.TYPE_NULL;
         if (value instanceof String) return RemoteContract.TYPE_STRING;
@@ -23,6 +39,14 @@ import java.util.Set;
         throw new AssertionError("Unknown preference type: " + value.getClass());
     }
 
+    /**
+     * Serializes the specified object to a format that is safe to use
+     * with {@link android.content.ContentValues}. To recover the original
+     * object, use {@link #deserializeInput(Object, int)}.
+     *
+     * @param value The object to serialize.
+     * @return The serialized object.
+     */
     public static Object serializeOutput(Object value) {
         if (value instanceof Boolean) {
             return serializeBoolean((Boolean)value);
@@ -33,6 +57,16 @@ import java.util.Set;
         }
     }
 
+    /**
+     * Deserializes an object that was serialized using
+     * {@link #serializeOutput(Object)}. If the expected type does
+     * not match the actual type of the object, a {@link ClassCastException}
+     * will be thrown.
+     *
+     * @param value The object to deserialize.
+     * @param expectedType The expected type of the deserialized object.
+     * @return The deserialized object.
+     */
     @SuppressWarnings("RedundantCast")
     public static Object deserializeInput(Object value, int expectedType) {
         if (expectedType == RemoteContract.TYPE_NULL) {
@@ -63,7 +97,14 @@ import java.util.Set;
         throw new IllegalArgumentException("Unknown type: " + expectedType);
     }
 
-    public static Integer serializeBoolean(Boolean value) {
+    /**
+     * Serializes a {@link Boolean} to a format that is safe to use
+     * with {@link android.content.ContentValues}.
+     *
+     * @param value The {@link Boolean} to serialize.
+     * @return 1 if {@code value} is {@code true}, 0 if {@code value} is {@code false}.
+     */
+    private static Integer serializeBoolean(Boolean value) {
         if (value == null) {
             return null;
         } else {
@@ -71,7 +112,14 @@ import java.util.Set;
         }
     }
 
-    public static Boolean deserializeBoolean(Object value) {
+    /**
+     * Deserializes a {@link Boolean} that was serialized using
+     * {@link #serializeBoolean(Boolean)}.
+     *
+     * @param value The {@link Boolean} to deserialize.
+     * @return {@code true} if {@code value} is 1, {@code false} if {@code value} is 0.
+     */
+    private static Boolean deserializeBoolean(Object value) {
         if (value == null) {
             return null;
         } else if (value instanceof Boolean) {
@@ -81,6 +129,13 @@ import java.util.Set;
         }
     }
 
+    /**
+     * Serializes a {@link Set<String>} to a format that is safe to use
+     * with {@link android.content.ContentValues}.
+     *
+     * @param stringSet The {@link Set<String>} to serialize.
+     * @return The serialized string set.
+     */
     public static String serializeStringSet(Set<String> stringSet) {
         if (stringSet == null) {
             return null;
@@ -93,6 +148,13 @@ import java.util.Set;
         return sb.toString();
     }
 
+    /**
+     * Deserializes a {@link Set<String>} that was serialized using
+     * {@link #serializeStringSet(Set)}.
+     *
+     * @param serializedString The {@link Set<String>} to deserialize.
+     * @return The deserialized string set.
+     */
     public static Set<String> deserializeStringSet(String serializedString) {
         if (serializedString == null) {
             return null;
@@ -111,6 +173,14 @@ import java.util.Set;
                 sb.append(c);
             }
         }
+
+        // Our implementation always ensures a trailing semicolon, but
+        // as the saying goes - be conservative in what you do, be
+        // liberal in what you accept.
+        if (sb.length() != 0) {
+            stringSet.add(sb.toString());
+        }
+
         return stringSet;
     }
 }
