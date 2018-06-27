@@ -6,7 +6,7 @@ package com.crossbowffs.remotepreferences;
  * <ul>
  *     <li>Preference provider component is disabled</li>
  *     <li>Preference provider denied access via {@link RemotePreferenceProvider#checkAccess(String, String, boolean)}</li>
- *     <li>Insufficient permissions to access provider (via AndroidManifest.xml)</li>
+ *     <li>Insufficient permissions to access provider (via {@code AndroidManifest.xml})</li>
  *     <li>Incorrect provider authority/file name passed to constructor</li>
  * </ul>
  */

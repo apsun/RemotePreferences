@@ -1,9 +1,6 @@
 # RemotePreferences
 
-A drop-in solution for global (inter-app) access to `SharedPreferences`.
-
-A word of warning: this library is currently under development and may
-not be suitable for usage in a production environment. Use at your own risk!
+A drop-in solution for inter-app access to `SharedPreferences`.
 
 
 ## Installation
@@ -16,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.5'
+    compile 'com.crossbowffs.remotepreferences:remotepreferences:0.6'
 }
 ```
 
@@ -50,7 +47,7 @@ name of the preference file:
 
 ```Java
 SharedPreferences prefs = new RemotePreferences(context, "com.example.app.preferences", "main_prefs");
-int intValue = prefs.getInt("my_int_pref", 0);
+int value = prefs.getInt("my_int_pref", 0);
 ```
 
 **WARNING**: **DO NOT** use `RemotePreferences` from within
@@ -107,15 +104,20 @@ protected boolean checkAccess(String prefName, String prefKey, boolean write) {
 }
 ```
 
+Warning: when checking an operation such as `getAll()` or `clear()`,
+`prefKey` will be an empty string. If you are blacklisting certain
+keys, make sure to also blacklist the `""` key as well!
+
 
 ## Strict mode
 
 To maintain API compatibility with `SharedPreferences`, by default any errors
 encountered while accessing the preference provider will be ignored, resulting
-in default values being returned from the getter methods. This can be caused
-by bugs in your code, or the user disabling your app/provider component.
-To detect and handle this scenario, you may opt-in to *strict mode* by passing
-an extra parameter to the `RemotePreferences` constructor:
+in default values being returned from the getter methods and `apply()` silently
+failing (we advise using `commit()` and checking the return value, at least).
+This can be caused by bugs in your code, or the user disabling your app/provider
+component. To detect and handle this scenario, you may opt-in to *strict mode*
+by passing an extra parameter to the `RemotePreferences` constructor:
 
 ```Java
 SharedPreferences prefs = new RemotePreferences(context, authority, prefName, true);
@@ -126,11 +128,9 @@ Now, if the preference provider cannot be accessed, a
 wrapping your preference accesses in a try-catch block:
 
 ```Java
-int intValue;
-String strValue;
 try {
-    intValue = prefs.getInt("my_int_pref", 0);
-    strValue = prefs.getString("my_string_pref", null);
+    int value = prefs.getInt("my_int_pref", 0);
+    prefs.edit().putInt("my_int_pref", value + 1).apply();
 } catch (RemotePreferenceAccessException e) {
     // Handle the error
 }
@@ -167,7 +167,9 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 0.6
 - Improved error checking
-- ???
+- Fixed case where strict mode was not applying when editing multiple preferences
+- Added more documentation for library internals
+- Updated project to modern Android Studio layout
 
 0.5
 

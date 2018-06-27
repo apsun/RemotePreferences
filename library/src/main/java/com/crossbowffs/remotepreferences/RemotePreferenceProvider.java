@@ -458,8 +458,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * (as opposed to the entire preference file).
      *
      * @param prefKey The preference key to check.
-     * @return {@code true} if the key refers to a single preference;
-     *         {@code false} otherwise.
+     * @return Whether the key refers to a single preference.
      */
     private static boolean isSingleKey(String prefKey) {
         return prefKey != null && prefKey.length() != 0;
@@ -486,9 +485,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * the only allowed combinations are:
      *
      * uri.key == values.key
-     * uri.key != null && values.key == null = URI key is used
-     * uri.key == null && values.key != null = values key is used
-     * uri.key == null && values.key == null = no key
+     * uri.key != null and values.key == null = URI key is used
+     * uri.key == null and values.key != null = values key is used
+     * uri.key == null and values.key == null = no key
      *
      * If none of these conditions are met, an exception is thrown.
      *
