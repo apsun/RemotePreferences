@@ -19,15 +19,37 @@ dependencies {
 
 2\. Subclass `RemotePreferenceProvider` and implement a 0-argument
 constructor which calls the super constructor with an authority
-(e.g. `"com.example.app.preferences"`) and an array of
-preference files to expose:
+(e.g. `"com.example.app.preferences"`) and a map of
+preference files (with modes: after unlock `Boolean.FALSE` and before unlock `Boolean.TRUE`) to expose:
 
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
-        super("com.example.app.preferences", new String[] {"main_prefs"});
+        super("com.example.app.preferences", map("main_prefs", Boolean.TRUE));
     }
 }
+
+private static Map<String, Boolean> map(Object... values) {
+        if (values.length%2==1)
+            throw new IllegalArgumentException("Map must have even number of values");
+        Map<String, Boolean> hashMap = new HashMap<>(values.length/2);
+        String key;
+        Boolean value;
+        for(int i=0; i<values.length; i=i+2) {
+            try {
+                key = (String) values[i];
+            } catch (ClassCastException e) {
+                continue;
+            }
+            try {
+                value = (Boolean) values[i+1];
+            } catch (ClassCastException e) {
+                continue;
+            }
+            hashMap.put(key, value);
+        }
+        return hashMap;
+    }
 ```
 
 3\. Add the corresponding entry to `AndroidManifest.xml`, with
@@ -61,6 +83,8 @@ if your code is executing within the app that owns the preferences. Only use
 
 Also note that your preference keys cannot be `null` or `""` (empty string).
 
+Additionally, if you are trying to use any of these preferences before the user unlocks the phone,
+use `context = context.createDeviceProtectedStorageContext()`. This is an Android limitation (feature?)
 
 ## Security
 

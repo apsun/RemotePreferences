@@ -67,7 +67,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     private static final int PREFERENCE_ID = 2;
 
     private final Uri mBaseUri;
-    private final String[] mPrefNames;
+    private final Map<String, Boolean> mPrefNames;
     private final Map<String, SharedPreferences> mPreferences;
     private final UriMatcher mUriMatcher;
 
@@ -79,12 +79,14 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * through the provider.
      *
      * @param authority The authority of the provider.
-     * @param prefNames The names of the preference files to expose.
+     * @param prefNames A hashmap with the names of the preference files and their status to expose (see below)
+     *                  false: credential protected storage, accessible after device is unlocked
+     *                  true: device protected storage, accessible on boot
      */
-    public RemotePreferenceProvider(String authority, String[] prefNames) {
+    public RemotePreferenceProvider(String authority, Map<String, Boolean> prefNames) {
         mBaseUri = Uri.parse("content://" + authority);
         mPrefNames = prefNames;
-        mPreferences = new HashMap<String, SharedPreferences>(prefNames.length);
+        mPreferences = new HashMap<String, SharedPreferences>(prefNames.size());
         mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
         mUriMatcher.addURI(authority, "*/", PREFERENCES_ID);
         mUriMatcher.addURI(authority, "*/*", PREFERENCE_ID);
@@ -121,8 +123,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         // is created. This method is called before almost all other code in
         // the app, which ensures that we never miss a preference change.
         Context context = getContext();
-        for (String prefName : mPrefNames) {
-            SharedPreferences prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+        if (context==null)
+            return false;
+        Context storageContext;
+        String prefName;
+        for (Map.Entry<String, Boolean> entry : mPrefNames.entrySet()) {
+            storageContext = context;
+            prefName = entry.getKey();
+            if (entry.getValue().equals(Boolean.TRUE))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+                    storageContext = context.createDeviceProtectedStorageContext();
+            SharedPreferences prefs = storageContext.getSharedPreferences(prefName, Context.MODE_PRIVATE);
             prefs.registerOnSharedPreferenceChangeListener(this);
             mPreferences.put(prefName, prefs);
         }
@@ -319,11 +330,18 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public void onSharedPreferenceChanged(SharedPreferences prefs, String prefKey) {
-        ContentResolver resolver = getContext().getContentResolver();
+        Context context = getContext();
+        if (context==null)
+            return;
         for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
             if (entry.getValue() == prefs) {
                 String prefName = entry.getKey();
+                Boolean isDeviceCredential = mPrefNames.get(prefName);
+                if (isDeviceCredential.equals(Boolean.TRUE))
+                    if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.N))
+                        context = context.createDeviceProtectedStorageContext();
                 Uri uri = getPreferenceUri(prefName, prefKey);
+                ContentResolver resolver = context.getContentResolver();
                 resolver.notifyChange(uri, null);
                 return;
             }
