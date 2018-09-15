@@ -119,7 +119,8 @@ accessed before the first unlock, the following modifications are needed.
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
-        super("com.example.app.preferences", new RemotePreferenceFile[] {new RemotePreferenceFile()"main_prefs", true)});
+        super("com.example.app.preferences", new RemotePreferenceFile[]
+                {new RemotePreferenceFile("main_prefs", true)});
     }
 }
 ```
