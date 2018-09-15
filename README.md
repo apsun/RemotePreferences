@@ -19,37 +19,15 @@ dependencies {
 
 2\. Subclass `RemotePreferenceProvider` and implement a 0-argument
 constructor which calls the super constructor with an authority
-(e.g. `"com.example.app.preferences"`) and a map of
-preference files (with modes: after unlock `Boolean.FALSE` and before unlock `Boolean.TRUE`) to expose:
+(e.g. `"com.example.app.preferences"`) and an array of
+preference files to expose:
 
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
-        super("com.example.app.preferences", map("main_prefs", Boolean.TRUE));
+        super("com.example.app.preferences", new String[] {"main_prefs"});
     }
 }
-
-private static Map<String, Boolean> map(Object... values) {
-        if (values.length%2==1)
-            throw new IllegalArgumentException("Map must have even number of values");
-        Map<String, Boolean> hashMap = new HashMap<>(values.length/2);
-        String key;
-        Boolean value;
-        for(int i=0; i<values.length; i=i+2) {
-            try {
-                key = (String) values[i];
-            } catch (ClassCastException e) {
-                continue;
-            }
-            try {
-                value = (Boolean) values[i+1];
-            } catch (ClassCastException e) {
-                continue;
-            }
-            hashMap.put(key, value);
-        }
-        return hashMap;
-    }
 ```
 
 3\. Add the corresponding entry to `AndroidManifest.xml`, with
@@ -83,8 +61,6 @@ if your code is executing within the app that owns the preferences. Only use
 
 Also note that your preference keys cannot be `null` or `""` (empty string).
 
-Additionally, if you are trying to use any of these preferences before the user unlocks the phone,
-use `context = context.createDeviceProtectedStorageContext()`. This is an Android limitation (feature?)
 
 ## Security
 
@@ -131,6 +107,49 @@ protected boolean checkAccess(String prefName, String prefKey, boolean write) {
 Warning: when checking an operation such as `getAll()` or `clear()`,
 `prefKey` will be an empty string. If you are blacklisting certain
 keys, make sure to also blacklist the `""` key as well!
+
+
+## Decrypted preferences
+
+By default, devices with Android N+ come with file-based encryption, which prevents
+RemotePreferences from accessing them before the first unlock after reboot. If preferences need to be
+accessed before the first unlock, the following modifications are needed.
+
+1\. Call to the super constructor in the RemotePreferenceProvider
+```Java
+public class MyPreferenceProvider extends RemotePreferenceProvider {
+    public MyPreferenceProvider() {
+        super("com.example.app.preferences", new RemotePreferenceFile[] {new RemotePreferenceFile()"main_prefs", true)});
+    }
+}
+```
+The `true` will cause the provider to use context.createDeviceProtectedStorageContext()
+for obtaining the preferences.
+
+2\. To make this change effective in your activity,
+use `preferenceManager.setStorageDeviceProtected()` or override the `getSharedPreferences`
+```Java
+@Override
+    public SharedPreferences getSharedPreferences(String name, int mode) {
+        Context context = getApplicationContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+            context = context.createDeviceProtectedStorageContext();
+        return context.getSharedPreferences(name, mode);
+    }
+```
+
+3\. Add direct boot to the AndroidManifest
+```XML
+<provider
+    android:name=".MyPreferenceProvider"
+    android:authorities="com.example.app.preferences"
+    android:exported="true"
+    android:directBootAware="true"/>
+```
+4\. Lastly, in the instantiation of `RemotePreferences`, use the correct Context
+```Java
+SharedPreferences prefs = new RemotePreferences(context.createDeviceProtectedStorageContext(), "com.example.app.preferences", "main_prefs");
+```
 
 
 ## Strict mode
