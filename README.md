@@ -109,7 +109,7 @@ Warning: when checking an operation such as `getAll()` or `clear()`,
 keys, make sure to also blacklist the `""` key as well!
 
 
-## Decrypted preferences
+## Device encrypted preferences
 
 By default, devices with Android N+ come with file-based encryption, which prevents
 RemotePreferences from accessing them before the first unlock after reboot. If preferences need to be
@@ -119,8 +119,9 @@ accessed before the first unlock, the following modifications are needed.
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
-        super("com.example.app.preferences", new RemotePreferenceFile[]
-                {new RemotePreferenceFile("main_prefs", true)});
+        super("com.example.app.preferences", new RemotePreferenceFile[] {
+            new RemotePreferenceFile("main_prefs", true)
+        });
     }
 }
 ```
