@@ -84,7 +84,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     public RemotePreferenceProvider(String authority, String[] prefNames) {
         mBaseUri = Uri.parse("content://" + authority);
         mPrefNames = prefNames;
-        mPreferences = new HashMap<String, SharedPreferences>(prefNames.length);
+        mPreferences = new HashMap<>(prefNames.length);
         mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
         mUriMatcher.addURI(authority, "*/", PREFERENCES_ID);
         mUriMatcher.addURI(authority, "*/*", PREFERENCE_ID);
@@ -120,13 +120,62 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         // We register the shared preference listener whenever the provider
         // is created. This method is called before almost all other code in
         // the app, which ensures that we never miss a preference change.
+        setPrefNames(mPrefNames);
+        return true;
+    }
+
+    /**
+     * Sets the specified preference file names in the remote preference provider.
+     *
+     * @param prefNames The names of the preference files to expose.
+     */
+    public void setPrefNames(String[] prefNames) {
+        for (SharedPreferences prefs : mPreferences.values()) {
+            prefs.unregisterOnSharedPreferenceChangeListener(this);
+        }
+        mPreferences.clear();
         Context context = getContext();
-        for (String prefName : mPrefNames) {
+        for (String prefName : prefNames) {
             SharedPreferences prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
             prefs.registerOnSharedPreferenceChangeListener(this);
             mPreferences.put(prefName, prefs);
         }
-        return true;
+    }
+
+    /**
+     * Returns the names of the preference files the provider exposes.
+     *
+     * @return The names of the preference files the provider exposes.
+     */
+    public String[] getPrefNames() {
+        return mPreferences.keySet().toArray(new String[0]);
+    }
+
+    /**
+     * Adds the specified preference name to the provider.
+     *
+     * @param prefName The name of the preference file to add.
+     */
+    public void addPrefName(String prefName) {
+        Context context = getContext();
+        if (!mPreferences.containsKey(prefName)) {
+            SharedPreferences prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            prefs.registerOnSharedPreferenceChangeListener(this);
+            mPreferences.put(prefName, prefs);
+        }
+    }
+
+    /**
+     * Removes the specified preference name from the provider.
+     *
+     * @param prefName The name of the preference file to remove.
+     */
+    public void removePrefName(String prefName) {
+        if (mPreferences.containsKey(prefName)) {
+            SharedPreferences prefs = mPreferences.get(prefName);
+            prefs.unregisterOnSharedPreferenceChangeListener(this);
+            mPreferences.remove(prefName);
+        }
     }
 
     /**
