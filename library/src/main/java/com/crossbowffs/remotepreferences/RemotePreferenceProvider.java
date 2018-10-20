@@ -110,13 +110,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         /**
          * The name of the preference file.
          */
-        public String prefFileName;
+        private final String mPrefFileName;
         /**
          * Context of the preference file.
          * Use true if these preferences need to be exposed before the first unlock
          * Or false, which is the default, if they are stored encrypted on the device.
          */
-        public boolean isDeviceProtected = false;
+        private final boolean mIsDeviceProtected = false;
 
         /**
          * Initialize the object.
@@ -125,8 +125,8 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
          *              credential protected (false).
          */
         public RemotePreferenceFile(String name, boolean state) {
-            prefFileName = name;
-            isDeviceProtected = state;
+            mPrefFileName = name;
+            mIsDeviceProtected = state;
         }
 
         /**
@@ -136,6 +136,20 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
          */
         public RemotePreferenceFile(String name) {
             this(name, false);
+        }
+
+        /*
+        * Return the file name
+        */
+        public String getPrefFileName() {
+            return mPrefFileName;
+        }
+
+        /*
+        * Return if it is in device protected context
+        */
+        public boolean isDeviceProtected() {
+            return mIsDeviceProtected;
         }
 
         /**
@@ -191,9 +205,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         else
             storageContext = context;
         for (RemotePreferenceFile file : mRemotePreferenceFiles) {
-            SharedPreferences prefs = (file.isDeviceProtected ? storageContext : context).getSharedPreferences(file.prefFileName, Context.MODE_PRIVATE);
+            SharedPreferences prefs = (file.isDeviceProtected() ? storageContext : context).getSharedPreferences(file.getPrefFileName(), Context.MODE_PRIVATE);
             prefs.registerOnSharedPreferenceChangeListener(this);
-            mPreferences.put(file.prefFileName, prefs);
+            mPreferences.put(file.getPrefFileName(), prefs);
         }
         return true;
     }
@@ -393,14 +407,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         Context context = getContext();
 
         RemotePreferenceFile remotePreferenceFile = getFileForPreferences(prefs);
-        if (remotePreferenceFile==null)
+        if (remotePreferenceFile==null) {
             return;
-        prefName = remotePreferenceFile.prefFileName;
-        isDeviceProtected = remotePreferenceFile.isDeviceProtected;
+        }
+        prefName = remotePreferenceFile.getPrefFileName();
+        isDeviceProtected = remotePreferenceFile.isDeviceProtected();
 
         Uri uri = getPreferenceUri(prefName, prefKey);
-        ContentResolver resolver = ((isDeviceProtected && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) ?
-                context.createDeviceProtectedStorageContext() : context).getContentResolver();
+        if (isDeviceProtected && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            context = context.createDeviceProtectedStorageContext();
+        }
+        ContentResolver resolver = context.getContentResolver();
         resolver.notifyChange(uri, null);
     }
 
@@ -413,19 +430,22 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     private RemotePreferenceFile getFileForPreferences(SharedPreferences sharedPrefs) {
         String prefName = null;
 
-        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet())
+        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
             if (entry.getValue() == sharedPrefs) {
                 prefName = entry.getKey();
                 break;
             }
+        }
 
-        if (prefName == null)
+        if (prefName == null) {
             return null;
+        }
 
-        for (RemotePreferenceFile remotePreferenceFile: mRemotePreferenceFiles)
-            if (remotePreferenceFile.prefFileName.equals(prefName))
+        for (RemotePreferenceFile remotePreferenceFile: mRemotePreferenceFiles) {
+            if (remotePreferenceFile.getPrefFileName().equals(prefName)) {
                 return remotePreferenceFile;
-
+            }
+        }
         return null;
     }
 
