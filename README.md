@@ -109,6 +109,51 @@ Warning: when checking an operation such as `getAll()` or `clear()`,
 keys, make sure to also blacklist the `""` key as well!
 
 
+## Device encrypted preferences
+
+By default, devices with Android N+ come with file-based encryption, which prevents
+RemotePreferences from accessing them before the first unlock after reboot. If preferences need to be
+accessed before the first unlock, the following modifications are needed.
+
+1\. Call to the super constructor in the RemotePreferenceProvider
+```Java
+public class MyPreferenceProvider extends RemotePreferenceProvider {
+    public MyPreferenceProvider() {
+        super("com.example.app.preferences", new RemotePreferenceFile[] {
+            new RemotePreferenceFile("main_prefs", true)
+        });
+    }
+}
+```
+The `true` will cause the provider to use context.createDeviceProtectedStorageContext()
+for obtaining the preferences.
+
+2\. To make this change effective in your activity,
+use `preferenceManager.setStorageDeviceProtected()` or override the `getSharedPreferences`
+```Java
+@Override
+    public SharedPreferences getSharedPreferences(String name, int mode) {
+        Context context = getApplicationContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+            context = context.createDeviceProtectedStorageContext();
+        return context.getSharedPreferences(name, mode);
+    }
+```
+
+3\. Add direct boot to the AndroidManifest
+```XML
+<provider
+    android:name=".MyPreferenceProvider"
+    android:authorities="com.example.app.preferences"
+    android:exported="true"
+    android:directBootAware="true"/>
+```
+4\. Lastly, in the instantiation of `RemotePreferences`, use the correct Context
+```Java
+SharedPreferences prefs = new RemotePreferences(context.createDeviceProtectedStorageContext(), "com.example.app.preferences", "main_prefs");
+```
+
+
 ## Strict mode
 
 To maintain API compatibility with `SharedPreferences`, by default any errors
