@@ -14,7 +14,7 @@ public class RemotePreferenceFile {
      * set {@code isDeviceProtected} to {@code true}.
      *
      * @param fileName Name of the preference file.
-     * @param isDeviceProtected {@code true} if the preference is device protected,
+     * @param isDeviceProtected {@code true} if the preference file is device protected,
      *                          {@code false} if it is credential protected.
      */
     public RemotePreferenceFile(String fileName, boolean isDeviceProtected) {
@@ -23,16 +23,19 @@ public class RemotePreferenceFile {
     }
 
     /**
-     * Another constructor for the object.
-     * Uses the credential protected context by default.
-     * @param name Name of the preference file.
+     * Initializes the preference file information. Assumes the preferences are
+     * located in credential protected storage.
+     *
+     * @param fileName Name of the preference file.
      */
-    public RemotePreferenceFile(String name) {
-        this(name, false);
+    public RemotePreferenceFile(String fileName) {
+        this(fileName, false);
     }
 
     /**
      * Returns the name of the preference file.
+     *
+     * @return The name of the preference file.
      */
     public String getFileName() {
         return mFileName;
@@ -40,6 +43,9 @@ public class RemotePreferenceFile {
 
     /**
      * Returns whether the preferences are located in device protected storage.
+     *
+     * @return {@code true} if the preference file is device protected,
+     *         {@code false} if it is credential protected.
      */
     public boolean isDeviceProtected() {
         return mIsDeviceProtected;
