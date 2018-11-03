@@ -1,8 +1,5 @@
 package com.crossbowffs.remotepreferences;
 
-import android.annotation.TargetApi;
-import android.os.Build;
-
 /**
  * Represents a single preference file and the information needed to
  * access that preference file.
@@ -20,7 +17,6 @@ public class RemotePreferenceFile {
      * @param isDeviceProtected {@code true} if the preference is device protected,
      *                          {@code false} if it is credential protected.
      */
-    @TargetApi(Build.VERSION_CODES.N)
     public RemotePreferenceFile(String fileName, boolean isDeviceProtected) {
         mFileName = fileName;
         mIsDeviceProtected = isDeviceProtected;

@@ -5,8 +5,8 @@ apply plugin: 'com.github.dcendents.android-maven'
 ext {
     packageName = 'com.crossbowffs.remotepreferences'
     libraryName = 'remotepreferences'
-    versionCode = 6
-    versionName = '0.6'
+    versionCode = 7
+    versionName = '0.7'
     licenses = ['MIT']
     vcsUrl = 'https://github.com/apsun/RemotePreferences.git'
 }
@@ -15,11 +15,11 @@ group = project.packageName
 version = project.versionName
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 28
 
     defaultConfig {
         minSdkVersion 1
-        targetSdkVersion 27
+        targetSdkVersion 28
         versionCode project.versionCode
         versionName project.versionName
     }

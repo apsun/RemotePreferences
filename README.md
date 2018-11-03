@@ -148,7 +148,7 @@ create the preferences. For example:
 
 ```Java
 Context prefContext = context.createDeviceProtectedStorageContext();
-SharedPreferences = prefContext.getSharedPreferences("main_prefs", MODE_PRIVATE);
+SharedPreferences prefs = prefContext.getSharedPreferences("main_prefs", MODE_PRIVATE);
 ```
 
 
@@ -207,6 +207,9 @@ Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 
 ## Changelog
+
+0.7
+- Added support for preferences located in device protected storage (thanks to Rijul-A)
 
 0.6
 - Improved error checking
