@@ -39,10 +39,10 @@ public class RemotePreferences implements SharedPreferences {
      *
      * @param context Used to access the preference provider.
      * @param authority The authority of the preference provider.
-     * @param prefName The name of the preference file to access.
+     * @param prefFileName The name of the preference file to access.
      */
-    public RemotePreferences(Context context, String authority, String prefName) {
-        this(context, authority, prefName, false);
+    public RemotePreferences(Context context, String authority, String prefFileName) {
+        this(context, authority, prefFileName, false);
     }
 
     /**
@@ -54,16 +54,16 @@ public class RemotePreferences implements SharedPreferences {
      *
      * @param context Used to access the preference provider.
      * @param authority The authority of the preference provider.
-     * @param prefName The name of the preference file to access.
+     * @param prefFileName The name of the preference file to access.
      * @param strictMode Whether strict mode is enabled.
      */
-    public RemotePreferences(Context context, String authority, String prefName, boolean strictMode) {
+    public RemotePreferences(Context context, String authority, String prefFileName, boolean strictMode) {
         checkNotNull("authority", authority);
         checkNotNull("context", context);
-        checkNotNull("prefName", prefName);
+        checkNotNull("prefFileName", prefFileName);
         mContext = context;
         mHandler = new Handler(context.getMainLooper());
-        mBaseUri = Uri.parse("content://" + authority).buildUpon().appendPath(prefName).build();
+        mBaseUri = Uri.parse("content://" + authority).buildUpon().appendPath(prefFileName).build();
         mListeners = new WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver>();
         mStrictMode = strictMode;
     }

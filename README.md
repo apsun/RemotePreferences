@@ -84,7 +84,7 @@ override the `checkAccess` method in your preference provider class:
 
 ```Java
 @Override
-protected boolean checkAccess(String prefName, String prefKey, boolean write) {
+protected boolean checkAccess(String prefFileName, String prefKey, boolean write) {
     // Only allow read access
     if (write) {
         return false;
@@ -163,7 +163,7 @@ component. To detect and handle this scenario, you may opt-in to *strict mode*
 by passing an extra parameter to the `RemotePreferences` constructor:
 
 ```Java
-SharedPreferences prefs = new RemotePreferences(context, authority, prefName, true);
+SharedPreferences prefs = new RemotePreferences(context, authority, prefFileName, true);
 ```
 
 Now, if the preference provider cannot be accessed, a
