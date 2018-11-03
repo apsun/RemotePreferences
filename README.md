@@ -111,36 +111,28 @@ keys, make sure to also blacklist the `""` key as well!
 
 ## Device encrypted preferences
 
-By default, devices with Android N+ come with file-based encryption, which prevents
-RemotePreferences from accessing them before the first unlock after reboot. If preferences need to be
-accessed before the first unlock, the following modifications are needed.
+By default, devices with Android N+ come with file-based encryption, which
+prevents RemotePreferences from accessing them before the first unlock after
+reboot. If preferences need to be accessed before the first unlock, the
+following modifications are needed.
 
-1\. Call to the super constructor in the RemotePreferenceProvider
+1\. Modify the provider constructor to mark the preference file as device protected:
+
 ```Java
 public class MyPreferenceProvider extends RemotePreferenceProvider {
     public MyPreferenceProvider() {
         super("com.example.app.preferences", new RemotePreferenceFile[] {
-            new RemotePreferenceFile("main_prefs", true)
+            new RemotePreferenceFile("main_prefs", /* isDeviceProtected */ true)
         });
     }
 }
 ```
-The `true` will cause the provider to use context.createDeviceProtectedStorageContext()
-for obtaining the preferences.
 
-2\. To make this change effective in your activity,
-use `preferenceManager.setStorageDeviceProtected()` or override the `getSharedPreferences`
-```Java
-@Override
-    public SharedPreferences getSharedPreferences(String name, int mode) {
-        Context context = getApplicationContext();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
-            context = context.createDeviceProtectedStorageContext();
-        return context.getSharedPreferences(name, mode);
-    }
-```
+This will cause the provider to use `context.createDeviceProtectedStorageContext()`
+to access the preferences.
 
-3\. Add direct boot to the AndroidManifest
+2\. Add support for direct boot in your manifest:
+
 ```XML
 <provider
     android:name=".MyPreferenceProvider"
@@ -148,9 +140,15 @@ use `preferenceManager.setStorageDeviceProtected()` or override the `getSharedPr
     android:exported="true"
     android:directBootAware="true"/>
 ```
-4\. Lastly, in the instantiation of `RemotePreferences`, use the correct Context
+
+3\. Update your app to access shared preferences from device protected storage.
+If you are using `PreferenceManager`, call `setStorageDeviceProtected()`. If you
+are using `SharedPreferences`, use `createDeviceProtectedStorageContext()` to
+create the preferences. For example:
+
 ```Java
-SharedPreferences prefs = new RemotePreferences(context.createDeviceProtectedStorageContext(), "com.example.app.preferences", "main_prefs");
+Context prefContext = context.createDeviceProtectedStorageContext();
+SharedPreferences = prefContext.getSharedPreferences("main_prefs", MODE_PRIVATE);
 ```
 
 

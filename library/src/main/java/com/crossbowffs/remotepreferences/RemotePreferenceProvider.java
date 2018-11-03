@@ -43,7 +43,7 @@ import java.util.Map;
  * query(uri = content://authority/foo)
  * = getSharedPreferences("foo").getAll()
  *
- * insert(uri = content://authority/foo/bar, values={type=TYPE_STRING, value="baz"})
+ * insert(uri = content://authority/foo/bar, values = [{type = TYPE_STRING, value = "baz"}])
  * = getSharedPreferences("foo").edit().putString("bar", "baz").commit()
  *
  * delete(uri = content://authority/foo/bar)
@@ -67,21 +67,25 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     private static final int PREFERENCE_ID = 2;
 
     private final Uri mBaseUri;
-    private final RemotePreferenceFile[] mRemotePreferenceFiles;
+    private final RemotePreferenceFile[] mPrefFiles;
     private final Map<String, SharedPreferences> mPreferences;
     private final UriMatcher mUriMatcher;
 
     /**
-     * A constructor for the provider, assumes all names passed are in the
-     * Credential Protected Context.
-     * See {@link #RemotePreferenceProvider(String, RemotePreferenceFile[])}
+     * Initializes the remote preference provider with the specified
+     * authority and preference file names. The authority must match the
+     * {@code android:authorities} property defined in your manifest
+     * file. Only the specified preference files will be accessible
+     * through the provider. This constructor assumes all preferences
+     * are located in credential protected storage; if you are using
+     * device protected storage, use
+     * {@link #RemotePreferenceProvider(String, RemotePreferenceFile[])}.
      *
      * @param authority The authority of the provider.
-     * @param prefNames An array of the file names with their Contexts to expose.
-     *                  See {@link RemotePreferenceFile}
+     * @param prefFileNames The names of the preference files to expose.
      */
-    public RemotePreferenceProvider(String authority, String[] prefNames) {
-        this(authority, RemotePreferenceFile.fromStringArray(prefNames));
+    public RemotePreferenceProvider(String authority, String[] prefFileNames) {
+        this(authority, RemotePreferenceFile.fromFileNames(prefFileNames));
     }
 
     /**
@@ -89,83 +93,18 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * authority and preference files. The authority must match the
      * {@code android:authorities} property defined in your manifest
      * file. Only the specified preference files will be accessible
-     * through the provider. Kept for backward compatibility.
+     * through the provider.
      *
      * @param authority The authority of the provider.
-     * @param prefNames The names of the preference files to expose.
+     * @param prefFiles The preference files to expose.
      */
-    public RemotePreferenceProvider(String authority, RemotePreferenceFile[] prefNames) {
+    public RemotePreferenceProvider(String authority, RemotePreferenceFile[] prefFiles) {
         mBaseUri = Uri.parse("content://" + authority);
-        mRemotePreferenceFiles = prefNames;
-        mPreferences = new HashMap<String, SharedPreferences>(prefNames.length);
+        mPrefFiles = prefFiles;
+        mPreferences = new HashMap<String, SharedPreferences>(prefFiles.length);
         mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
         mUriMatcher.addURI(authority, "*/", PREFERENCES_ID);
         mUriMatcher.addURI(authority, "*/*", PREFERENCE_ID);
-    }
-
-    /**
-     * Class for tagging each preference file's Context.
-     */
-    public static class RemotePreferenceFile {
-        /**
-         * The name of the preference file.
-         */
-        private final String mPrefFileName;
-        /**
-         * Context of the preference file.
-         * Use true if these preferences need to be exposed before the first unlock
-         * Or false, which is the default, if they are stored encrypted on the device.
-         */
-        private final boolean mIsDeviceProtected = false;
-
-        /**
-         * Initialize the object.
-         * @param name  Name of the preference file.
-         * @param state A boolean indicating whether the Context is device protected (true), or
-         *              credential protected (false).
-         */
-        public RemotePreferenceFile(String name, boolean state) {
-            mPrefFileName = name;
-            mIsDeviceProtected = state;
-        }
-
-        /**
-         * Another constructor for the object.
-         * Uses the credential protected context by default.
-         * @param name  Name of the preference file.
-         */
-        public RemotePreferenceFile(String name) {
-            this(name, false);
-        }
-
-        /*
-        * Return the file name
-        */
-        public String getPrefFileName() {
-            return mPrefFileName;
-        }
-
-        /*
-        * Return if it is in device protected context
-        */
-        public boolean isDeviceProtected() {
-            return mIsDeviceProtected;
-        }
-
-        /**
-         * A class for converting an array of strings to an array of RemotePreferenceFile.
-         * Assumed all Contexts used are Credential Protected Contexts.
-         * Kept for backward compatibility.
-         * @param prefNames An array of the file names to expose
-         * @return          An array of the file names exposed
-         */
-        private static RemotePreferenceFile[] fromStringArray (String[] prefNames) {
-            RemotePreferenceFile[] remotePreferenceFiles = new RemotePreferenceFile[prefNames.length];
-            for (int i = 0; i < prefNames.length; i++) {
-                remotePreferenceFiles[i] = new RemotePreferenceFile(prefNames[i]);
-            }
-            return remotePreferenceFiles;
-        }
     }
 
     /**
@@ -177,14 +116,14 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * over a blacklist (your default case should be {@code return false},
      * not {@code return true}).
      *
-     * @param prefName The name of the preference file.
+     * @param prefFileName The name of the preference file.
      * @param prefKey The preference key. This is an empty string when handling the
      *                {@link SharedPreferences#getAll()} and
      *                {@link SharedPreferences.Editor#clear()} operations.
      * @param write {@code true} for put/remove/clear operations; {@code false} for get operations.
      * @return {@code true} if the access is allowed; {@code false} otherwise.
      */
-    protected boolean checkAccess(String prefName, String prefKey, boolean write) {
+    protected boolean checkAccess(String prefFileName, String prefKey, boolean write) {
         return true;
     }
 
@@ -195,28 +134,26 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public boolean onCreate() {
-        // We register the shared preference listener whenever the provider
+        // We register the shared preference listeners whenever the provider
         // is created. This method is called before almost all other code in
         // the app, which ensures that we never miss a preference change.
-        Context context = getContext();
-        Context storageContext = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
-            storageContext = context.createDeviceProtectedStorageContext();
-        else
-            storageContext = context;
-        for (RemotePreferenceFile file : mRemotePreferenceFiles) {
-            SharedPreferences prefs = (file.isDeviceProtected() ? storageContext : context).getSharedPreferences(file.getPrefFileName(), Context.MODE_PRIVATE);
+        for (RemotePreferenceFile file : mPrefFiles) {
+            Context context = getContext();
+            if (file.isDeviceProtected() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                context = context.createDeviceProtectedStorageContext();
+            }
+            SharedPreferences prefs = context.getSharedPreferences(file.getFileName(), Context.MODE_PRIVATE);
             prefs.registerOnSharedPreferenceChangeListener(this);
-            mPreferences.put(file.getPrefFileName(), prefs);
+            mPreferences.put(file.getFileName(), prefs);
         }
         return true;
     }
 
     /**
      * Returns a cursor for the specified preference(s). If {@code uri}
-     * is in the form {@code content://authority/prefName/prefKey}, the
+     * is in the form {@code content://authority/prefFileName/prefKey}, the
      * cursor will contain a single row containing the queried preference.
-     * If {@code uri} is in the form {@code content://authority/prefName},
+     * If {@code uri} is in the form {@code content://authority/prefFileName},
      * the cursor will contain one row for each preference in the specified
      * file.
      *
@@ -229,11 +166,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        PrefNameKeyPair nameKeyPair = parseUri(uri);
-        String prefName = nameKeyPair.name;
-        String rawPrefKey = nameKeyPair.key;
+        PrefPath prefPath = parseUri(uri);
+        String prefFileName = prefPath.fileName;
+        String rawPrefKey = prefPath.key;
 
-        SharedPreferences prefs = getPreferencesOrThrow(prefName, rawPrefKey, false);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, rawPrefKey, false);
         Map<String, ?> prefMap = prefs.getAll();
 
         // If no projection is specified, we return all columns.
@@ -284,17 +221,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             return null;
         }
 
-        PrefNameKeyPair nameKeyPair = parseUri(uri);
-        String prefName = nameKeyPair.name;
-        String prefKey = getKeyFromUriOrValues(nameKeyPair, values);
+        PrefPath prefPath = parseUri(uri);
+        String prefFileName = prefPath.fileName;
+        String prefKey = getKeyFromUriOrValues(prefPath, values);
 
-        SharedPreferences prefs = getPreferencesOrThrow(prefName, prefKey, true);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, prefKey, true);
         SharedPreferences.Editor editor = prefs.edit();
 
         putPreference(editor, prefKey, values);
 
         if (editor.commit()) {
-            return getPreferenceUri(prefName, prefKey);
+            return getPreferenceUri(prefFileName, prefKey);
         } else {
             return null;
         }
@@ -302,7 +239,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     /**
      * Writes multiple preference values at once. {@code uri} must
-     * be in the form {@code content://authority/prefName}. See
+     * be in the form {@code content://authority/prefFileName}. See
      * {@link #insert(Uri, ContentValues)} for more information.
      *
      * @param uri Specifies the preference file to write to.
@@ -311,18 +248,18 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
-        PrefNameKeyPair nameKeyPair = parseUri(uri);
-        String prefName = nameKeyPair.name;
-        if (isSingleKey(nameKeyPair.key)) {
+        PrefPath prefPath = parseUri(uri);
+        String prefFileName = prefPath.fileName;
+        if (isSingleKey(prefPath.key)) {
             throw new IllegalArgumentException("Cannot bulk insert with single key URI");
         }
 
-        SharedPreferences prefs = getPreferencesByName(prefName);
+        SharedPreferences prefs = getSharedPreferencesByName(prefFileName);
         SharedPreferences.Editor editor = prefs.edit();
 
         for (ContentValues value : values) {
             String prefKey = getKeyFromValues(value);
-            checkAccessOrThrow(prefName, prefKey, true);
+            checkAccessOrThrow(prefFileName, prefKey, true);
             putPreference(editor, prefKey, value);
         }
 
@@ -335,9 +272,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
     /**
      * Deletes the specified preference(s). If {@code uri} is in the form
-     * {@code content://authority/prefName/prefKey}, this will only delete
+     * {@code content://authority/prefFileName/prefKey}, this will only delete
      * the one preference specified in the URI; if {@code uri} is in the form
-     * {@code content://authority/prefName}, clears all preferences.
+     * {@code content://authority/prefFileName}, clears all preferences.
      *
      * @param uri Specifies the preference file and key (optional) to delete.
      * @param selection Ignored.
@@ -346,11 +283,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        PrefNameKeyPair nameKeyPair = parseUri(uri);
-        String prefName = nameKeyPair.name;
-        String prefKey = nameKeyPair.key;
+        PrefPath prefPath = parseUri(uri);
+        String prefFileName = prefPath.fileName;
+        String prefKey = prefPath.key;
 
-        SharedPreferences prefs = getPreferencesOrThrow(prefName, prefKey, true);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, prefKey, true);
         SharedPreferences.Editor editor = prefs.edit();
 
         if (isSingleKey(prefKey)) {
@@ -402,51 +339,14 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public void onSharedPreferenceChanged(SharedPreferences prefs, String prefKey) {
-        String prefName = null;
-        boolean isDeviceProtected = false;
+        RemotePreferenceFile prefFile = getSharedPreferencesFile(prefs);
+        Uri uri = getPreferenceUri(prefFile.getFileName(), prefKey);
         Context context = getContext();
-
-        RemotePreferenceFile remotePreferenceFile = getFileForPreferences(prefs);
-        if (remotePreferenceFile==null) {
-            return;
-        }
-        prefName = remotePreferenceFile.getPrefFileName();
-        isDeviceProtected = remotePreferenceFile.isDeviceProtected();
-
-        Uri uri = getPreferenceUri(prefName, prefKey);
-        if (isDeviceProtected && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        if (prefFile.isDeviceProtected() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             context = context.createDeviceProtectedStorageContext();
         }
         ContentResolver resolver = context.getContentResolver();
         resolver.notifyChange(uri, null);
-    }
-
-    /**
-     * Get the RemotePreferenceFile object for corresponding SharedPreferences object
-     *
-     * @param sharedPrefs The preference file for which the object is requested
-     * @return null if such an object was not found, otherwise the object
-     */
-    private RemotePreferenceFile getFileForPreferences(SharedPreferences sharedPrefs) {
-        String prefName = null;
-
-        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
-            if (entry.getValue() == sharedPrefs) {
-                prefName = entry.getKey();
-                break;
-            }
-        }
-
-        if (prefName == null) {
-            return null;
-        }
-
-        for (RemotePreferenceFile remotePreferenceFile: mRemotePreferenceFiles) {
-            if (remotePreferenceFile.getPrefFileName().equals(prefName)) {
-                return remotePreferenceFile;
-            }
-        }
-        return null;
     }
 
     /**
@@ -546,9 +446,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * is not specified, the returned tuple will contain {@code ""} as the key.
      *
      * @param uri The URI to parse.
-     * @return A tuple containing the preference file and key.
+     * @return A tuple containing the preference file name and key.
      */
-    private PrefNameKeyPair parseUri(Uri uri) {
+    private PrefPath parseUri(Uri uri) {
         int match = mUriMatcher.match(uri);
         if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
             throw new IllegalArgumentException("Invalid URI: " + uri);
@@ -556,20 +456,20 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
 
         // The URI must fall under one of these patterns:
         //
-        //   content://authority/prefName/prefKey
-        //   content://authority/prefName/
-        //   content://authority/prefName
+        //   content://authority/prefFileName/prefKey
+        //   content://authority/prefFileName/
+        //   content://authority/prefFileName
         //
         // The match ID will be PREFERENCE_ID under the first case,
         // and PREFERENCES_ID under the second and third cases
         // (UriMatcher ignores trailing slashes).
         List<String> pathSegments = uri.getPathSegments();
-        String prefName = pathSegments.get(0);
+        String prefFileName = pathSegments.get(0);
         String prefKey = "";
         if (match == PREFERENCE_ID) {
             prefKey = pathSegments.get(1);
         }
-        return new PrefNameKeyPair(prefName, prefKey);
+        return new PrefPath(prefFileName, prefKey);
     }
 
     /**
@@ -610,12 +510,12 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      *
      * If none of these conditions are met, an exception is thrown.
      *
-     * @param nameKeyPair Parsed URI key from {@link #parseUri(Uri)}.
+     * @param prefPath Parsed URI key from {@link #parseUri(Uri)}.
      * @param values Query values provided by the caller.
      * @return The parsed key.
      */
-    private static String getKeyFromUriOrValues(PrefNameKeyPair nameKeyPair, ContentValues values) {
-        String uriKey = nameKeyPair.key;
+    private static String getKeyFromUriOrValues(PrefPath prefPath, ContentValues values) {
+        String uriKey = prefPath.key;
         String valuesKey = getKeyFromValues(values);
         if (uriKey.length() != 0 && valuesKey.length() != 0) {
             // If a key is specified in both the URI and
@@ -637,13 +537,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * Checks that the caller has permissions to access the specified preference.
      * Throws an exception if permission is denied.
      *
-     * @param prefName The preference file to be accessed.
+     * @param prefFileName The preference file to be accessed.
      * @param prefKey The preference key to be accessed.
      * @param write Whether the operation will modify the preference.
      */
-    private void checkAccessOrThrow(String prefName, String prefKey, boolean write) {
-        if (!checkAccess(prefName, prefKey, write)) {
-            throw new SecurityException("Insufficient permissions to access: " + prefName + "/" + prefKey);
+    private void checkAccessOrThrow(String prefFileName, String prefKey, boolean write) {
+        if (!checkAccess(prefFileName, prefKey, write)) {
+            throw new SecurityException("Insufficient permissions to access: " + prefFileName + "/" + prefKey);
         }
     }
 
@@ -653,15 +553,50 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * except that it will used the internally cached version, and throws an
      * exception if the provider was not configured to access that preference file.
      *
-     * @param prefName The name of the preference file to access.
+     * @param prefFileName The name of the preference file to access.
      * @return The {@link SharedPreferences} instance with the specified file name.
      */
-    private SharedPreferences getPreferencesByName(String prefName) {
-        SharedPreferences prefs = mPreferences.get(prefName);
+    private SharedPreferences getSharedPreferencesByName(String prefFileName) {
+        SharedPreferences prefs = mPreferences.get(prefFileName);
         if (prefs == null) {
-            throw new IllegalArgumentException("Unknown preference file name: " + prefName);
+            throw new IllegalArgumentException("Unknown preference file name: " + prefFileName);
         }
         return prefs;
+    }
+
+    /**
+     * Returns the file name for a {@link SharedPreferences} instance.
+     * Throws an exception if the provider was not configured to access
+     * the specified preferences.
+     *
+     * @param prefs The shared preferences object.
+     * @return The name of the preference file.
+     */
+    private String getSharedPreferencesFileName(SharedPreferences prefs) {
+        for (Map.Entry<String, SharedPreferences> entry : mPreferences.entrySet()) {
+            if (entry.getValue() == prefs) {
+                return entry.getKey();
+            }
+        }
+        throw new IllegalArgumentException("Unknown preference file");
+    }
+
+    /**
+     * Get the corresponding {@link RemotePreferenceFile} object for a
+     * {@link SharedPreferences} instance. Throws an exception if the
+     * provider was not configured to access the specified preferences.
+     *
+     * @param prefs The shared preferences object.
+     * @return The corresponding {@link RemotePreferenceFile} object.
+     */
+    private RemotePreferenceFile getSharedPreferencesFile(SharedPreferences prefs) {
+        String prefFileName = getSharedPreferencesFileName(prefs);
+        for (RemotePreferenceFile file : mPrefFiles) {
+            if (file.getFileName().equals(prefFileName)) {
+                return file;
+            }
+        }
+        throw new IllegalArgumentException("Unknown preference file");
     }
 
     /**
@@ -669,26 +604,26 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * checking that the caller has permissions to access the specified key within
      * that file. If not, an exception will be thrown.
      *
-     * @param prefName The preference file to be accessed.
+     * @param prefFileName The preference file to be accessed.
      * @param prefKey The preference key to be accessed.
      * @param write Whether the operation will modify the preference.
      * @return The {@link SharedPreferences} instance with the specified file name.
      */
-    private SharedPreferences getPreferencesOrThrow(String prefName, String prefKey, boolean write) {
-        checkAccessOrThrow(prefName, prefKey, write);
-        return getPreferencesByName(prefName);
+    private SharedPreferences getSharedPreferencesOrThrow(String prefFileName, String prefKey, boolean write) {
+        checkAccessOrThrow(prefFileName, prefKey, write);
+        return getSharedPreferencesByName(prefFileName);
     }
 
     /**
      * Builds a URI for the specified preference file and key that can be used
      * to later query the same preference.
      *
-     * @param prefName The preference file.
+     * @param prefFileName The preference file.
      * @param prefKey The preference key.
      * @return A URI representing the specified preference.
      */
-    private Uri getPreferenceUri(String prefName, String prefKey) {
-        Uri.Builder builder = mBaseUri.buildUpon().appendPath(prefName);
+    private Uri getPreferenceUri(String prefFileName, String prefKey) {
+        Uri.Builder builder = mBaseUri.buildUpon().appendPath(prefFileName);
         if (isSingleKey(prefKey)) {
             builder.appendPath(prefKey);
         }
@@ -698,12 +633,12 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     /**
      * Basically just a tuple of (preference file, preference key).
      */
-    private static class PrefNameKeyPair {
-        private final String name;
+    private static class PrefPath {
+        private final String fileName;
         private final String key;
 
-        private PrefNameKeyPair(String prefName, String prefKey) {
-            name = prefName;
+        private PrefPath(String prefFileName, String prefKey) {
+            fileName = prefFileName;
             key = prefKey;
         }
     }
