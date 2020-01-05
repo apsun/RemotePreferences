@@ -46,6 +46,9 @@ import java.util.Map;
  * insert(uri = content://authority/foo/bar, values = [{type = TYPE_STRING, value = "baz"}])
  * = getSharedPreferences("foo").edit().putString("bar", "baz").commit()
  *
+ * insert(uri = content://authority/foo, values = [{key = "bar", type = TYPE_STRING, value = "baz"}])
+ * = getSharedPreferences("foo").edit().putString("bar", "baz").commit()
+ *
  * delete(uri = content://authority/foo/bar)
  * = getSharedPreferences("foo").edit().remove("bar").commit()
  *

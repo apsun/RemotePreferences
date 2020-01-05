@@ -200,6 +200,12 @@ implemented using `ContentObserver`.
 This solution does **not** use `MODE_WORLD_WRITEABLE` (which was
 deprecated in Android 4.2) or any other file permission hacks.
 
+## Running tests
+
+Connect your Android device and run:
+```
+gradle :testapp:connectedAndroidTest
+```
 
 ## License
 

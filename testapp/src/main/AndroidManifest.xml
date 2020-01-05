@@ -1,0 +1,15 @@
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.crossbowffs.remotepreferences.app">
+    <application>
+        <provider
+            android:authorities="${applicationId}.preferences"
+            android:name=".MyPreferenceProvider"
+            android:exported="true"/>
+        <provider
+            android:enabled="false"
+            android:authorities="${applicationId}.preferences.disabled"
+            android:name=".MyPreferenceProviderDisabled"
+            android:exported="true"/>
+    </application>
+</manifest>
