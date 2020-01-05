@@ -105,6 +105,7 @@ public class RemotePreferenceProviderTest {
         ContentResolver resolver = getLocalContext().getContentResolver();
         try {
             resolver.query(getQueryUri(Constants.UNREADABLE_PREF_KEY), null, null, null, null);
+            Assert.fail();
         } catch (SecurityException e) {
             // Expected
         }
