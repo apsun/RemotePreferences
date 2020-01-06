@@ -17,6 +17,11 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+
 @RunWith(AndroidJUnit4.class)
 public class RemotePreferenceProviderTest {
     private Context getLocalContext() {
@@ -295,5 +300,89 @@ public class RemotePreferenceProviderTest {
         }
 
         Assert.assertEquals("nyaa", prefs.getString(Constants.UNWRITABLE_PREF_KEY, "default"));
+    }
+
+    @Test
+    public void testReadBoolean() {
+        getSharedPreferences()
+            .edit()
+            .putBoolean("true", true)
+            .putBoolean("false", false)
+            .apply();
+
+        ContentResolver resolver = getLocalContext().getContentResolver();
+        Cursor q = resolver.query(getQueryUri(null), null, null, null, null);
+        Assert.assertEquals(2, q.getCount());
+
+        int key = q.getColumnIndex(RemoteContract.COLUMN_KEY);
+        int type = q.getColumnIndex(RemoteContract.COLUMN_TYPE);
+        int value = q.getColumnIndex(RemoteContract.COLUMN_VALUE);
+
+        while (q.moveToNext()) {
+            if (q.getString(key).equals("true")) {
+                Assert.assertEquals(RemoteContract.TYPE_BOOLEAN, q.getInt(type));
+                Assert.assertEquals(1, q.getInt(value));
+            } else if (q.getString(key).equals("false")) {
+                Assert.assertEquals(RemoteContract.TYPE_BOOLEAN, q.getInt(type));
+                Assert.assertEquals(0, q.getInt(value));
+            } else {
+                Assert.fail();
+            }
+        }
+    }
+
+    @Test
+    public void testReadStringSet() {
+        HashSet<String> set = new HashSet<>();
+        set.add("foo");
+        set.add("bar");
+
+        getSharedPreferences()
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        ContentResolver resolver = getLocalContext().getContentResolver();
+        Cursor q = resolver.query(getQueryUri("pref"), null, null, null, null);
+        Assert.assertEquals(1, q.getCount());
+
+        int key = q.getColumnIndex(RemoteContract.COLUMN_KEY);
+        int type = q.getColumnIndex(RemoteContract.COLUMN_TYPE);
+        int value = q.getColumnIndex(RemoteContract.COLUMN_VALUE);
+
+        while (q.moveToNext()) {
+            if (q.getString(key).equals("pref")) {
+                Assert.assertEquals(RemoteContract.TYPE_STRING_SET, q.getInt(type));
+
+                // Horrible implementation detail that I now regret but can't change without
+                // breaking backwards compatibility: Set<String> when serialized to a String
+                // will always end with an extra delimiter. If we just split on the delimiter
+                // we get an extraneous empty element at the end, so trim it off here.
+                String serialized = q.getString(value);
+                serialized = serialized.substring(0, serialized.length() - 1);
+                Assert.assertEquals(set, new HashSet<>(Arrays.asList(serialized.split(";"))));
+            } else {
+                Assert.fail();
+            }
+        }
+    }
+
+    @Test
+    public void testInsertStringSet() {
+        ContentValues values = new ContentValues();
+        values.put(RemoteContract.COLUMN_KEY, "pref");
+        values.put(RemoteContract.COLUMN_TYPE, RemoteContract.TYPE_STRING_SET);
+        values.put(RemoteContract.COLUMN_VALUE, "foo;bar\\;;baz;;");
+
+        ContentResolver resolver = getLocalContext().getContentResolver();
+        Uri uri = resolver.insert(getQueryUri(null), values);
+        Assert.assertEquals(getQueryUri("pref"), uri);
+
+        HashSet<String> set = new HashSet<>();
+        set.add("foo");
+        set.add("bar;");
+        set.add("baz");
+        set.add("");
+        Assert.assertEquals(set, getSharedPreferences().getStringSet("pref", null));
     }
 }

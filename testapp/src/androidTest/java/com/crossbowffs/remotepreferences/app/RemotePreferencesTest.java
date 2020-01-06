@@ -247,4 +247,72 @@ public class RemotePreferencesTest {
 
         Assert.assertEquals("foobar", remotePrefs.getString(Constants.UNWRITABLE_PREF_KEY, "default"));
     }
+
+    @Test
+    public void testReadStringAsStringSetFail() {
+        getSharedPreferences()
+            .edit()
+            .putString("pref", "foo;bar;")
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(false);
+        try {
+            remotePrefs.getStringSet("pref", null);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadStringSetAsStringFail() {
+        HashSet<String> set = new HashSet<>();
+        set.add("foo");
+        set.add("bar");
+
+        getSharedPreferences()
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(false);
+        try {
+            remotePrefs.getString("pref", null);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadBooleanAsIntFail() {
+        getSharedPreferences()
+            .edit()
+            .putBoolean("pref", true)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(false);
+        try {
+            remotePrefs.getInt("pref", 0);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadIntAsBooleanFail() {
+        getSharedPreferences()
+            .edit()
+            .putInt("pref", 42)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(false);
+        try {
+            remotePrefs.getBoolean("pref", false);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
 }
