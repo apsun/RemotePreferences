@@ -15,6 +15,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.HashSet;
+import java.util.Map;
 
 @RunWith(AndroidJUnit4.class)
 public class RemotePreferencesTest {
@@ -102,6 +103,55 @@ public class RemotePreferencesTest {
     }
 
     @Test
+    public void testGetAll() {
+        getSharedPreferences()
+            .edit()
+            .putString("string", "foobar")
+            .putInt("int", 0xeceb3026)
+            .putFloat("float", 3.14f)
+            .putBoolean("bool", true)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        Map<String, ?> prefs = remotePrefs.getAll();
+        Assert.assertEquals("foobar", prefs.get("string"));
+        Assert.assertEquals(0xeceb3026, prefs.get("int"));
+        Assert.assertEquals(3.14f, prefs.get("float"));
+        Assert.assertEquals(true, prefs.get("bool"));
+    }
+
+    @Test
+    public void testContains() {
+        getSharedPreferences()
+            .edit()
+            .putString("string", "foobar")
+            .putInt("int", 0xeceb3026)
+            .putFloat("float", 3.14f)
+            .putBoolean("bool", true)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        Assert.assertTrue(remotePrefs.contains("string"));
+        Assert.assertTrue(remotePrefs.contains("int"));
+        Assert.assertFalse(remotePrefs.contains("nonexistent"));
+    }
+
+    @Test
+    public void testClear() {
+        getSharedPreferences()
+            .edit()
+            .putString("string", "foobar")
+            .putInt("int", 0xeceb3026)
+            .putFloat("float", 3.14f)
+            .putBoolean("bool", true)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        remotePrefs.edit().clear().apply();
+        Assert.assertEquals(0, getSharedPreferences().getAll().size());
+    }
+
+    @Test
     public void testStringSetWrite() {
         HashSet<String> set = new HashSet<>();
         set.add("Chocola");
@@ -110,6 +160,60 @@ public class RemotePreferencesTest {
         set.add("Azuki");
         set.add("Maple");
         set.add("Cinnamon");
+
+        getRemotePreferences(true)
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        SharedPreferences sharedPrefs = getSharedPreferences();
+        Assert.assertEquals(set, sharedPrefs.getStringSet("pref", null));
+    }
+
+    @Test
+    public void testEmptyStringSetRead() {
+        HashSet<String> set = new HashSet<>();
+
+        getSharedPreferences()
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        Assert.assertEquals(set, remotePrefs.getStringSet("pref", null));
+    }
+
+    @Test
+    public void testEmptyStringSetWrite() {
+        HashSet<String> set = new HashSet<>();
+
+        getRemotePreferences(true)
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        SharedPreferences sharedPrefs = getSharedPreferences();
+        Assert.assertEquals(set, sharedPrefs.getStringSet("pref", null));
+    }
+
+    @Test
+    public void testSetContainingEmptyStringRead() {
+        HashSet<String> set = new HashSet<>();
+        set.add("");
+
+        getSharedPreferences()
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        Assert.assertEquals(set, remotePrefs.getStringSet("pref", null));
+    }
+
+    @Test
+    public void testSetContainingEmptyStringWrite() {
+        HashSet<String> set = new HashSet<>();
+        set.add("");
 
         getRemotePreferences(true)
             .edit()
