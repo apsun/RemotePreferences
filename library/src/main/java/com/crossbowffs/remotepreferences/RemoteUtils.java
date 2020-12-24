@@ -174,11 +174,12 @@ import java.util.Set;
             }
         }
 
-        // Our implementation always ensures a trailing semicolon, but
-        // as the saying goes - be conservative in what you do, be
-        // liberal in what you accept.
+        // We require that the serialized string ends with a ; per element
+        // since that's how we distinguish empty sets from sets containing
+        // an empty string. Assume caller is doing unsafe string joins
+        // instead of using the serializeStringSet API, and fail fast.
         if (sb.length() != 0) {
-            stringSet.add(sb.toString());
+            throw new IllegalArgumentException("Serialized string set contains trailing chars");
         }
 
         return stringSet;

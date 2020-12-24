@@ -1,4 +1,4 @@
-package com.crossbowffs.remotepreferences.app;
+package com.crossbowffs.remotepreferences;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -10,17 +10,14 @@ import android.net.Uri;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.crossbowffs.remotepreferences.RemoteContract;
+import com.crossbowffs.remotepreferences.testapp.TestConstants;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 
 @RunWith(AndroidJUnit4.class)
 public class RemotePreferenceProviderTest {
@@ -34,11 +31,11 @@ public class RemotePreferenceProviderTest {
 
     private SharedPreferences getSharedPreferences() {
         Context context = getRemoteContext();
-        return context.getSharedPreferences(Constants.PREF_FILE, Context.MODE_PRIVATE);
+        return context.getSharedPreferences(TestConstants.PREF_FILE, Context.MODE_PRIVATE);
     }
 
     private Uri getQueryUri(String key) {
-        String uri = "content://" + Constants.AUTHORITY + "/" + Constants.PREF_FILE;
+        String uri = "content://" + TestConstants.AUTHORITY + "/" + TestConstants.PREF_FILE;
         if (key != null) {
             uri += "/" + key;
         }
@@ -105,11 +102,11 @@ public class RemotePreferenceProviderTest {
     public void testQueryFailPermissionCheck() {
         getSharedPreferences()
             .edit()
-            .putString(Constants.UNREADABLE_PREF_KEY, "foobar")
+            .putString(TestConstants.UNREADABLE_PREF_KEY, "foobar")
             .apply();
         ContentResolver resolver = getLocalContext().getContentResolver();
         try {
-            resolver.query(getQueryUri(Constants.UNREADABLE_PREF_KEY), null, null, null, null);
+            resolver.query(getQueryUri(TestConstants.UNREADABLE_PREF_KEY), null, null, null, null);
             Assert.fail();
         } catch (SecurityException e) {
             // Expected
@@ -232,7 +229,7 @@ public class RemotePreferenceProviderTest {
         values[0].put(RemoteContract.COLUMN_VALUE, "foobar");
 
         values[1] = new ContentValues();
-        values[1].put(RemoteContract.COLUMN_KEY, Constants.UNWRITABLE_PREF_KEY);
+        values[1].put(RemoteContract.COLUMN_KEY, TestConstants.UNWRITABLE_PREF_KEY);
         values[1].put(RemoteContract.COLUMN_TYPE, RemoteContract.TYPE_INT);
         values[1].put(RemoteContract.COLUMN_VALUE, 1337);
 
@@ -246,7 +243,7 @@ public class RemotePreferenceProviderTest {
 
         SharedPreferences prefs = getSharedPreferences();
         Assert.assertEquals("default", prefs.getString("string", "default"));
-        Assert.assertEquals(0, prefs.getInt(Constants.UNWRITABLE_PREF_KEY, 0));
+        Assert.assertEquals(0, prefs.getInt(TestConstants.UNWRITABLE_PREF_KEY, 0));
     }
 
     @Test
@@ -288,18 +285,18 @@ public class RemotePreferenceProviderTest {
         SharedPreferences prefs = getSharedPreferences();
         prefs
             .edit()
-            .putString(Constants.UNWRITABLE_PREF_KEY, "nyaa")
+            .putString(TestConstants.UNWRITABLE_PREF_KEY, "nyaa")
             .apply();
 
         ContentResolver resolver = getLocalContext().getContentResolver();
         try {
-            resolver.delete(getQueryUri(Constants.UNWRITABLE_PREF_KEY), null, null);
+            resolver.delete(getQueryUri(TestConstants.UNWRITABLE_PREF_KEY), null, null);
             Assert.fail();
         } catch (SecurityException e) {
             // Expected
         }
 
-        Assert.assertEquals("nyaa", prefs.getString(Constants.UNWRITABLE_PREF_KEY, "default"));
+        Assert.assertEquals("nyaa", prefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
     }
 
     @Test
@@ -335,7 +332,9 @@ public class RemotePreferenceProviderTest {
     public void testReadStringSet() {
         HashSet<String> set = new HashSet<>();
         set.add("foo");
-        set.add("bar");
+        set.add("bar;");
+        set.add("baz");
+        set.add("");
 
         getSharedPreferences()
             .edit()
@@ -353,14 +352,8 @@ public class RemotePreferenceProviderTest {
         while (q.moveToNext()) {
             if (q.getString(key).equals("pref")) {
                 Assert.assertEquals(RemoteContract.TYPE_STRING_SET, q.getInt(type));
-
-                // Horrible implementation detail that I now regret but can't change without
-                // breaking backwards compatibility: Set<String> when serialized to a String
-                // will always end with an extra delimiter. If we just split on the delimiter
-                // we get an extraneous empty element at the end, so trim it off here.
                 String serialized = q.getString(value);
-                serialized = serialized.substring(0, serialized.length() - 1);
-                Assert.assertEquals(set, new HashSet<>(Arrays.asList(serialized.split(";"))));
+                Assert.assertEquals(set, RemoteUtils.deserializeStringSet(serialized));
             } else {
                 Assert.fail();
             }
@@ -369,20 +362,21 @@ public class RemotePreferenceProviderTest {
 
     @Test
     public void testInsertStringSet() {
-        ContentValues values = new ContentValues();
-        values.put(RemoteContract.COLUMN_KEY, "pref");
-        values.put(RemoteContract.COLUMN_TYPE, RemoteContract.TYPE_STRING_SET);
-        values.put(RemoteContract.COLUMN_VALUE, "foo;bar\\;;baz;;");
-
-        ContentResolver resolver = getLocalContext().getContentResolver();
-        Uri uri = resolver.insert(getQueryUri(null), values);
-        Assert.assertEquals(getQueryUri("pref"), uri);
-
         HashSet<String> set = new HashSet<>();
         set.add("foo");
         set.add("bar;");
         set.add("baz");
         set.add("");
+
+        ContentValues values = new ContentValues();
+        values.put(RemoteContract.COLUMN_KEY, "pref");
+        values.put(RemoteContract.COLUMN_TYPE, RemoteContract.TYPE_STRING_SET);
+        values.put(RemoteContract.COLUMN_VALUE, RemoteUtils.serializeStringSet(set));
+
+        ContentResolver resolver = getLocalContext().getContentResolver();
+        Uri uri = resolver.insert(getQueryUri(null), values);
+        Assert.assertEquals(getQueryUri("pref"), uri);
+
         Assert.assertEquals(set, getSharedPreferences().getStringSet("pref", null));
     }
 }

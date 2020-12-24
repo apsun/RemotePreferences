@@ -1,15 +1,15 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.crossbowffs.remotepreferences.app">
+    package="com.crossbowffs.remotepreferences.testapp">
     <application>
         <provider
             android:authorities="${applicationId}.preferences"
-            android:name=".MyPreferenceProvider"
+            android:name=".TestPreferenceProvider"
             android:exported="true"/>
         <provider
             android:enabled="false"
             android:authorities="${applicationId}.preferences.disabled"
-            android:name=".MyPreferenceProviderDisabled"
+            android:name=".TestPreferenceProviderDisabled"
             android:exported="true"/>
     </application>
 </manifest>

@@ -1,4 +1,4 @@
-package com.crossbowffs.remotepreferences.app;
+package com.crossbowffs.remotepreferences;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -6,8 +6,7 @@ import android.content.SharedPreferences;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.crossbowffs.remotepreferences.RemotePreferenceAccessException;
-import com.crossbowffs.remotepreferences.RemotePreferences;
+import com.crossbowffs.remotepreferences.testapp.TestConstants;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -29,19 +28,19 @@ public class RemotePreferencesTest {
 
     private SharedPreferences getSharedPreferences() {
         Context context = getRemoteContext();
-        return context.getSharedPreferences(Constants.PREF_FILE, Context.MODE_PRIVATE);
+        return context.getSharedPreferences(TestConstants.PREF_FILE, Context.MODE_PRIVATE);
     }
 
     private RemotePreferences getRemotePreferences(boolean strictMode) {
         // This is not a typo! We are using the LOCAL context to initialize a REMOTE prefs
         // instance. This is the whole point of RemotePreferences!
         Context context = getLocalContext();
-        return new RemotePreferences(context, Constants.AUTHORITY, Constants.PREF_FILE, strictMode);
+        return new RemotePreferences(context, TestConstants.AUTHORITY, TestConstants.PREF_FILE, strictMode);
     }
 
     private RemotePreferences getDisabledRemotePreferences(boolean strictMode) {
         Context context = getLocalContext();
-        return new RemotePreferences(context, Constants.AUTHORITY_DISABLED, Constants.PREF_FILE, strictMode);
+        return new RemotePreferences(context, TestConstants.AUTHORITY_DISABLED, TestConstants.PREF_FILE, strictMode);
     }
 
     @Before
@@ -271,7 +270,7 @@ public class RemotePreferencesTest {
     public void testUnreadablePrefStrictMode() {
         RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
-            remotePrefs.getString(Constants.UNREADABLE_PREF_KEY, null);
+            remotePrefs.getString(TestConstants.UNREADABLE_PREF_KEY, null);
             Assert.fail();
         } catch (RemotePreferenceAccessException e) {
             // Expected
@@ -281,7 +280,7 @@ public class RemotePreferencesTest {
     @Test
     public void testUnreadablePrefNonStrictMode() {
         RemotePreferences remotePrefs = getRemotePreferences(false);
-        Assert.assertEquals("default", remotePrefs.getString(Constants.UNREADABLE_PREF_KEY, "default"));
+        Assert.assertEquals("default", remotePrefs.getString(TestConstants.UNREADABLE_PREF_KEY, "default"));
     }
 
     @Test
@@ -290,7 +289,7 @@ public class RemotePreferencesTest {
         try {
             remotePrefs
                 .edit()
-                .putString(Constants.UNWRITABLE_PREF_KEY, "foobar")
+                .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
                 .apply();
             Assert.fail();
         } catch (RemotePreferenceAccessException e) {
@@ -304,7 +303,7 @@ public class RemotePreferencesTest {
         Assert.assertFalse(
             remotePrefs
                 .edit()
-                .putString(Constants.UNWRITABLE_PREF_KEY, "foobar")
+                .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
                 .commit()
         );
     }
@@ -343,13 +342,13 @@ public class RemotePreferencesTest {
     public void testRemoveUnwritablePref() {
         getSharedPreferences()
             .edit()
-            .putString(Constants.UNWRITABLE_PREF_KEY, "foobar")
+            .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
             .apply();
 
         RemotePreferences remotePrefs = getRemotePreferences(false);
-        Assert.assertFalse(remotePrefs.edit().remove(Constants.UNWRITABLE_PREF_KEY).commit());
+        Assert.assertFalse(remotePrefs.edit().remove(TestConstants.UNWRITABLE_PREF_KEY).commit());
 
-        Assert.assertEquals("foobar", remotePrefs.getString(Constants.UNWRITABLE_PREF_KEY, "default"));
+        Assert.assertEquals("foobar", remotePrefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
     }
 
     @Test

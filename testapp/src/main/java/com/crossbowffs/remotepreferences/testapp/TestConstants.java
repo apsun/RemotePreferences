@@ -1,7 +1,7 @@
-package com.crossbowffs.remotepreferences.app;
+package com.crossbowffs.remotepreferences.testapp;
 
-/* package */ final class Constants {
-    private Constants() {}
+public final class TestConstants {
+    private TestConstants() {}
 
     public static final String AUTHORITY = BuildConfig.APPLICATION_ID + ".preferences";
     public static final String AUTHORITY_DISABLED = BuildConfig.APPLICATION_ID + ".preferences.disabled";
