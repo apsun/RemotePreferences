@@ -22,10 +22,10 @@ import java.util.List;
 
     /**
      * Parses the preference file and key from a query URI. If the key
-     * is not specified, the returned tuple will contain {@code ""} as the key.
+     * is not specified, the returned path will contain {@code null} as the key.
      *
      * @param uri The URI to parse.
-     * @return A tuple containing the preference file name and key.
+     * @return A path object containing the preference file name and key.
      */
     public RemotePreferencePath parse(Uri uri) {
         int match = mUriMatcher.match(uri);
@@ -44,7 +44,7 @@ import java.util.List;
         // (UriMatcher ignores trailing slashes).
         List<String> pathSegments = uri.getPathSegments();
         String prefFileName = pathSegments.get(0);
-        String prefKey = "";
+        String prefKey = null;
         if (match == PREFERENCE_ID) {
             prefKey = pathSegments.get(1);
         }

@@ -494,7 +494,7 @@ public class RemotePreferencesTest {
                 .apply();
 
             Assert.assertTrue(listener.waitForChange(1));
-            Assert.assertEquals("", listener.getKey());
+            Assert.assertNull(listener.getKey());
         } finally {
             remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
         }

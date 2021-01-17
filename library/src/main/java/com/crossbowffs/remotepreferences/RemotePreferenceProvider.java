@@ -164,10 +164,8 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         RemotePreferencePath prefPath = mUriParser.parse(uri);
-        String prefFileName = prefPath.fileName;
-        String rawPrefKey = prefPath.key;
 
-        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, rawPrefKey, false);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefPath, false);
         Map<String, ?> prefMap = prefs.getAll();
 
         // If no projection is specified, we return all columns.
@@ -178,9 +176,9 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         // Fill out the cursor with the preference data. If the caller
         // didn't ask for a particular preference, we return all of them.
         MatrixCursor cursor = new MatrixCursor(projection);
-        if (isSingleKey(rawPrefKey)) {
-            Object prefValue = prefMap.get(rawPrefKey);
-            cursor.addRow(buildRow(projection, rawPrefKey, prefValue));
+        if (isSingleKey(prefPath.key)) {
+            Object prefValue = prefMap.get(prefPath.key);
+            cursor.addRow(buildRow(projection, prefPath.key, prefValue));
         } else {
             for (Map.Entry<String, ?> entry : prefMap.entrySet()) {
                 String prefKey = entry.getKey();
@@ -219,16 +217,15 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         }
 
         RemotePreferencePath prefPath = mUriParser.parse(uri);
-        String prefFileName = prefPath.fileName;
         String prefKey = getKeyFromUriOrValues(prefPath, values);
 
-        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, prefKey, true);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefPath, true);
         SharedPreferences.Editor editor = prefs.edit();
 
         putPreference(editor, prefKey, values);
 
         if (editor.commit()) {
-            return getPreferenceUri(prefFileName, prefKey);
+            return getPreferenceUri(prefPath.fileName, prefKey);
         } else {
             return null;
         }
@@ -246,17 +243,17 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
         RemotePreferencePath prefPath = mUriParser.parse(uri);
-        String prefFileName = prefPath.fileName;
+
         if (isSingleKey(prefPath.key)) {
             throw new IllegalArgumentException("Cannot bulk insert with single key URI");
         }
 
-        SharedPreferences prefs = getSharedPreferencesByName(prefFileName);
+        SharedPreferences prefs = getSharedPreferencesByName(prefPath.fileName);
         SharedPreferences.Editor editor = prefs.edit();
 
         for (ContentValues value : values) {
             String prefKey = getKeyFromValues(value);
-            checkAccessOrThrow(prefFileName, prefKey, true);
+            checkAccessOrThrow(prefPath.withKey(prefKey), true);
             putPreference(editor, prefKey, value);
         }
 
@@ -281,14 +278,12 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         RemotePreferencePath prefPath = mUriParser.parse(uri);
-        String prefFileName = prefPath.fileName;
-        String prefKey = prefPath.key;
 
-        SharedPreferences prefs = getSharedPreferencesOrThrow(prefFileName, prefKey, true);
+        SharedPreferences prefs = getSharedPreferencesOrThrow(prefPath, true);
         SharedPreferences.Editor editor = prefs.edit();
 
-        if (isSingleKey(prefKey)) {
-            editor.remove(prefKey);
+        if (isSingleKey(prefPath.key)) {
+            editor.remove(prefPath.key);
         } else {
             editor.clear();
         }
@@ -353,7 +348,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * operation.
      *
      * @param editor The preference file to modify.
-     * @param prefKey The preference key to modify, or {@code ""} for the entire file.
+     * @param prefKey The preference key to modify, or {@code null} for the entire file.
      * @param values The values to write.
      */
     @SuppressWarnings("ConstantConditions")
@@ -446,20 +441,20 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * @return Whether the key refers to a single preference.
      */
     private static boolean isSingleKey(String prefKey) {
-        return prefKey != null && prefKey.length() != 0;
+        return prefKey != null;
     }
 
     /**
      * Parses the preference key from {@code values}. If the key is not
-     * specified in the values, {@code ""} is returned.
+     * specified in the values, {@code null} is returned.
      *
      * @param values The query values to parse.
-     * @return The parsed key, or {@code ""} if no key was found.
+     * @return The parsed key, or {@code null} if no key was found.
      */
     private static String getKeyFromValues(ContentValues values) {
         String key = values.getAsString(RemoteContract.COLUMN_KEY);
-        if (key == null) {
-            key = "";
+        if (key != null && key.length() == 0) {
+            key = null;
         }
         return key;
     }
@@ -478,24 +473,24 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      *
      * @param prefPath Parsed URI key from {@code mUriParser.parse(uri)}.
      * @param values Query values provided by the caller.
-     * @return The parsed key.
+     * @return The parsed key, or {@code null} if the key refers to a preference file.
      */
     private static String getKeyFromUriOrValues(RemotePreferencePath prefPath, ContentValues values) {
         String uriKey = prefPath.key;
         String valuesKey = getKeyFromValues(values);
-        if (uriKey.length() != 0 && valuesKey.length() != 0) {
+        if (isSingleKey(uriKey) && isSingleKey(valuesKey)) {
             // If a key is specified in both the URI and
             // ContentValues, they must match
             if (!uriKey.equals(valuesKey)) {
                 throw new IllegalArgumentException("Conflicting keys specified in URI and ContentValues");
             }
             return uriKey;
-        } else if (uriKey.length() != 0) {
+        } else if (isSingleKey(uriKey)) {
             return uriKey;
-        } else if (valuesKey.length() != 0) {
+        } else if (isSingleKey(valuesKey)) {
             return valuesKey;
         } else {
-            return "";
+            return null;
         }
     }
 
@@ -503,13 +498,19 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * Checks that the caller has permissions to access the specified preference.
      * Throws an exception if permission is denied.
      *
-     * @param prefFileName The preference file to be accessed.
-     * @param prefKey The preference key to be accessed.
+     * @param prefPath The preference file and key to be accessed.
      * @param write Whether the operation will modify the preference.
      */
-    private void checkAccessOrThrow(String prefFileName, String prefKey, boolean write) {
-        if (!checkAccess(prefFileName, prefKey, write)) {
-            throw new SecurityException("Insufficient permissions to access: " + prefFileName + "/" + prefKey);
+    private void checkAccessOrThrow(RemotePreferencePath prefPath, boolean write) {
+        // For backwards compatibility, checkAccess takes an empty string when
+        // referring to the whole file.
+        String prefKey = prefPath.key;
+        if (!isSingleKey(prefKey)) {
+            prefKey = "";
+        }
+
+        if (!checkAccess(prefPath.fileName, prefKey, write)) {
+            throw new SecurityException("Insufficient permissions to access: " + prefPath);
         }
     }
 
@@ -570,14 +571,13 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * checking that the caller has permissions to access the specified key within
      * that file. If not, an exception will be thrown.
      *
-     * @param prefFileName The preference file to be accessed.
-     * @param prefKey The preference key to be accessed.
+     * @param prefPath The preference file and key to be accessed.
      * @param write Whether the operation will modify the preference.
      * @return The {@link SharedPreferences} instance with the specified file name.
      */
-    private SharedPreferences getSharedPreferencesOrThrow(String prefFileName, String prefKey, boolean write) {
-        checkAccessOrThrow(prefFileName, prefKey, write);
-        return getSharedPreferencesByName(prefFileName);
+    private SharedPreferences getSharedPreferencesOrThrow(RemotePreferencePath prefPath, boolean write) {
+        checkAccessOrThrow(prefPath, write);
+        return getSharedPreferencesByName(prefPath.fileName);
     }
 
     /**
