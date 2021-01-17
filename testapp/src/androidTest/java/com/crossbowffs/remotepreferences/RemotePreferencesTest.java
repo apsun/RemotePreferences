@@ -464,11 +464,6 @@ public class RemotePreferencesTest {
         RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
         TestPreferenceListener listener = new TestPreferenceListener();
 
-        getSharedPreferences()
-            .edit()
-            .putInt("foobar", 1337)
-            .apply();
-
         try {
             remotePrefs.registerOnSharedPreferenceChangeListener(listener);
 
