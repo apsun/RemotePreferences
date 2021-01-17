@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -19,8 +18,6 @@ import org.junit.runner.RunWith;
 
 import java.util.HashSet;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public class RemotePreferencesTest {
@@ -77,25 +74,6 @@ public class RemotePreferencesTest {
     }
 
     @Test
-    public void testStringSetRead() {
-        HashSet<String> set = new HashSet<>();
-        set.add("Chocola");
-        set.add("Vanilla");
-        set.add("Coconut");
-        set.add("Azuki");
-        set.add("Maple");
-        set.add("Cinnamon");
-
-        getSharedPreferences()
-            .edit()
-            .putStringSet("pref", set)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        Assert.assertEquals(set, remotePrefs.getStringSet("pref", null));
-    }
-
-    @Test
     public void testBasicWrite() {
         getRemotePreferences(true)
             .edit()
@@ -110,6 +88,38 @@ public class RemotePreferencesTest {
         Assert.assertEquals(0xeceb3026, sharedPrefs.getInt("int", 0));
         Assert.assertEquals(3.14f, sharedPrefs.getFloat("float", 0f), 0.0);
         Assert.assertEquals(true, sharedPrefs.getBoolean("bool", false));
+    }
+
+    @Test
+    public void testRemove() {
+        getSharedPreferences()
+            .edit()
+            .putString("string", "foobar")
+            .putInt("int", 0xeceb3026)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        remotePrefs.edit().remove("string").apply();
+
+        Assert.assertEquals("default", remotePrefs.getString("string", "default"));
+        Assert.assertEquals(0xeceb3026, remotePrefs.getInt("int", 0));
+    }
+
+    @Test
+    public void testClear() {
+        SharedPreferences sharedPrefs = getSharedPreferences();
+        getSharedPreferences()
+            .edit()
+            .putString("string", "foobar")
+            .putInt("int", 0xeceb3026)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        remotePrefs.edit().clear().apply();
+
+        Assert.assertEquals(0, sharedPrefs.getAll().size());
+        Assert.assertEquals("default", remotePrefs.getString("string", "default"));
+        Assert.assertEquals(0, remotePrefs.getInt("int", 0));
     }
 
     @Test
@@ -147,18 +157,29 @@ public class RemotePreferencesTest {
     }
 
     @Test
-    public void testClear() {
+    public void testReadNonexistentPref() {
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        Assert.assertEquals("default", remotePrefs.getString("nonexistent_string", "default"));
+        Assert.assertEquals(1337, remotePrefs.getInt("nonexistent_int", 1337));
+    }
+
+    @Test
+    public void testStringSetRead() {
+        HashSet<String> set = new HashSet<>();
+        set.add("Chocola");
+        set.add("Vanilla");
+        set.add("Coconut");
+        set.add("Azuki");
+        set.add("Maple");
+        set.add("Cinnamon");
+
         getSharedPreferences()
             .edit()
-            .putString("string", "foobar")
-            .putInt("int", 0xeceb3026)
-            .putFloat("float", 3.14f)
-            .putBoolean("bool", true)
+            .putStringSet("pref", set)
             .apply();
 
         RemotePreferences remotePrefs = getRemotePreferences(true);
-        remotePrefs.edit().clear().apply();
-        Assert.assertEquals(0, getSharedPreferences().getAll().size());
+        Assert.assertEquals(set, remotePrefs.getStringSet("pref", null));
     }
 
     @Test
@@ -235,10 +256,71 @@ public class RemotePreferencesTest {
     }
 
     @Test
-    public void testReadNonexistentPref() {
+    public void testReadStringAsStringSetFail() {
+        getSharedPreferences()
+            .edit()
+            .putString("pref", "foo;bar;")
+            .apply();
+
         RemotePreferences remotePrefs = getRemotePreferences(true);
-        Assert.assertEquals("default", remotePrefs.getString("nonexistent_string", "default"));
-        Assert.assertEquals(1337, remotePrefs.getInt("nonexistent_int", 1337));
+        try {
+            remotePrefs.getStringSet("pref", null);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadStringSetAsStringFail() {
+        HashSet<String> set = new HashSet<>();
+        set.add("foo");
+        set.add("bar");
+
+        getSharedPreferences()
+            .edit()
+            .putStringSet("pref", set)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        try {
+            remotePrefs.getString("pref", null);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadBooleanAsIntFail() {
+        getSharedPreferences()
+            .edit()
+            .putBoolean("pref", true)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        try {
+            remotePrefs.getInt("pref", 0);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
+    }
+
+    @Test
+    public void testReadIntAsBooleanFail() {
+        getSharedPreferences()
+            .edit()
+            .putInt("pref", 42)
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        try {
+            remotePrefs.getBoolean("pref", false);
+            Assert.fail();
+        } catch (ClassCastException e) {
+            // Expected
+        }
     }
 
     @Test
@@ -345,104 +427,6 @@ public class RemotePreferencesTest {
         Assert.assertFalse(remotePrefs.edit().remove(TestConstants.UNWRITABLE_PREF_KEY).commit());
 
         Assert.assertEquals("foobar", remotePrefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
-    }
-
-    @Test
-    public void testRemovePref() {
-        getSharedPreferences()
-            .edit()
-            .putString("string", "foobar")
-            .putInt("int", 0xeceb3026)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        remotePrefs.edit().remove("string").apply();
-
-        Assert.assertEquals("default", remotePrefs.getString("string", "default"));
-        Assert.assertEquals(0xeceb3026, remotePrefs.getInt("int", 0));
-    }
-
-    @Test
-    public void testRemoveAll() {
-        getSharedPreferences()
-            .edit()
-            .putString("string", "foobar")
-            .putInt("int", 0xeceb3026)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        remotePrefs.edit().clear().apply();
-
-        Assert.assertEquals("default", remotePrefs.getString("string", "default"));
-        Assert.assertEquals(0, remotePrefs.getInt("int", 0));
-    }
-
-    @Test
-    public void testReadStringAsStringSetFail() {
-        getSharedPreferences()
-            .edit()
-            .putString("pref", "foo;bar;")
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        try {
-            remotePrefs.getStringSet("pref", null);
-            Assert.fail();
-        } catch (ClassCastException e) {
-            // Expected
-        }
-    }
-
-    @Test
-    public void testReadStringSetAsStringFail() {
-        HashSet<String> set = new HashSet<>();
-        set.add("foo");
-        set.add("bar");
-
-        getSharedPreferences()
-            .edit()
-            .putStringSet("pref", set)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        try {
-            remotePrefs.getString("pref", null);
-            Assert.fail();
-        } catch (ClassCastException e) {
-            // Expected
-        }
-    }
-
-    @Test
-    public void testReadBooleanAsIntFail() {
-        getSharedPreferences()
-            .edit()
-            .putBoolean("pref", true)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        try {
-            remotePrefs.getInt("pref", 0);
-            Assert.fail();
-        } catch (ClassCastException e) {
-            // Expected
-        }
-    }
-
-    @Test
-    public void testReadIntAsBooleanFail() {
-        getSharedPreferences()
-            .edit()
-            .putInt("pref", 42)
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(true);
-        try {
-            remotePrefs.getBoolean("pref", false);
-            Assert.fail();
-        } catch (ClassCastException e) {
-            // Expected
-        }
     }
 
     @Test
