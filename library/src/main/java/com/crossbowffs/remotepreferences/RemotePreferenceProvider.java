@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Build;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,13 +65,10 @@ import java.util.Map;
  * </p>
  */
 public abstract class RemotePreferenceProvider extends ContentProvider implements SharedPreferences.OnSharedPreferenceChangeListener {
-    private static final int PREFERENCES_ID = 1;
-    private static final int PREFERENCE_ID = 2;
-
     private final Uri mBaseUri;
     private final RemotePreferenceFile[] mPrefFiles;
     private final Map<String, SharedPreferences> mPreferences;
-    private final UriMatcher mUriMatcher;
+    private final RemotePreferenceUriParser mUriParser;
 
     /**
      * Initializes the remote preference provider with the specified
@@ -105,9 +101,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
         mBaseUri = Uri.parse("content://" + authority);
         mPrefFiles = prefFiles;
         mPreferences = new HashMap<String, SharedPreferences>(prefFiles.length);
-        mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
-        mUriMatcher.addURI(authority, "*/", PREFERENCES_ID);
-        mUriMatcher.addURI(authority, "*/*", PREFERENCE_ID);
+        mUriParser = new RemotePreferenceUriParser(authority);
     }
 
     /**
@@ -169,7 +163,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        PrefPath prefPath = parseUri(uri);
+        RemotePreferencePath prefPath = mUriParser.parse(uri);
         String prefFileName = prefPath.fileName;
         String rawPrefKey = prefPath.key;
 
@@ -224,7 +218,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             return null;
         }
 
-        PrefPath prefPath = parseUri(uri);
+        RemotePreferencePath prefPath = mUriParser.parse(uri);
         String prefFileName = prefPath.fileName;
         String prefKey = getKeyFromUriOrValues(prefPath, values);
 
@@ -251,7 +245,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public int bulkInsert(Uri uri, ContentValues[] values) {
-        PrefPath prefPath = parseUri(uri);
+        RemotePreferencePath prefPath = mUriParser.parse(uri);
         String prefFileName = prefPath.fileName;
         if (isSingleKey(prefPath.key)) {
             throw new IllegalArgumentException("Cannot bulk insert with single key URI");
@@ -286,7 +280,7 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      */
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        PrefPath prefPath = parseUri(uri);
+        RemotePreferencePath prefPath = mUriParser.parse(uri);
         String prefFileName = prefPath.fileName;
         String prefKey = prefPath.key;
 
@@ -445,37 +439,6 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
     }
 
     /**
-     * Parses the preference file and key from a query URI. If the key
-     * is not specified, the returned tuple will contain {@code ""} as the key.
-     *
-     * @param uri The URI to parse.
-     * @return A tuple containing the preference file name and key.
-     */
-    private PrefPath parseUri(Uri uri) {
-        int match = mUriMatcher.match(uri);
-        if (match != PREFERENCE_ID && match != PREFERENCES_ID) {
-            throw new IllegalArgumentException("Invalid URI: " + uri);
-        }
-
-        // The URI must fall under one of these patterns:
-        //
-        //   content://authority/prefFileName/prefKey
-        //   content://authority/prefFileName/
-        //   content://authority/prefFileName
-        //
-        // The match ID will be PREFERENCE_ID under the first case,
-        // and PREFERENCES_ID under the second and third cases
-        // (UriMatcher ignores trailing slashes).
-        List<String> pathSegments = uri.getPathSegments();
-        String prefFileName = pathSegments.get(0);
-        String prefKey = "";
-        if (match == PREFERENCE_ID) {
-            prefKey = pathSegments.get(1);
-        }
-        return new PrefPath(prefFileName, prefKey);
-    }
-
-    /**
      * Returns whether the specified key represents a single preference key
      * (as opposed to the entire preference file).
      *
@@ -513,11 +476,11 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      *
      * If none of these conditions are met, an exception is thrown.
      *
-     * @param prefPath Parsed URI key from {@link #parseUri(Uri)}.
+     * @param prefPath Parsed URI key from {@code mUriParser.parse(uri)}.
      * @param values Query values provided by the caller.
      * @return The parsed key.
      */
-    private static String getKeyFromUriOrValues(PrefPath prefPath, ContentValues values) {
+    private static String getKeyFromUriOrValues(RemotePreferencePath prefPath, ContentValues values) {
         String uriKey = prefPath.key;
         String valuesKey = getKeyFromValues(values);
         if (uriKey.length() != 0 && valuesKey.length() != 0) {
@@ -631,18 +594,5 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             builder.appendPath(prefKey);
         }
         return builder.build();
-    }
-
-    /**
-     * Basically just a tuple of (preference file, preference key).
-     */
-    private static class PrefPath {
-        private final String fileName;
-        private final String key;
-
-        private PrefPath(String prefFileName, String prefKey) {
-            fileName = prefFileName;
-            key = prefKey;
-        }
     }
 }

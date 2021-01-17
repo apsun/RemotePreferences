@@ -30,8 +30,9 @@ public class RemotePreferences implements SharedPreferences {
     private final Context mContext;
     private final Handler mHandler;
     private final Uri mBaseUri;
-    private final WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver> mListeners;
     private final boolean mStrictMode;
+    private final WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver> mListeners;
+    private final RemotePreferenceUriParser mUriParser;
 
     /**
      * Initializes a new remote preferences object, with strict
@@ -58,14 +59,33 @@ public class RemotePreferences implements SharedPreferences {
      * @param strictMode Whether strict mode is enabled.
      */
     public RemotePreferences(Context context, String authority, String prefFileName, boolean strictMode) {
-        checkNotNull("authority", authority);
+        this(context, new Handler(context.getMainLooper()), authority, prefFileName, strictMode);
+    }
+
+    /**
+     * Initializes a new remote preferences object. If {@code strictMode}
+     * is {@code true} and the remote preference provider cannot be accessed,
+     * read/write operations on this object will throw a
+     * {@link RemotePreferenceAccessException}. Otherwise, default values
+     * will be returned.
+     *
+     * @param context Used to access the preference provider.
+     * @param handler Used to receive preference change events.
+     * @param authority The authority of the preference provider.
+     * @param prefFileName The name of the preference file to access.
+     * @param strictMode Whether strict mode is enabled.
+     */
+    RemotePreferences(Context context, Handler handler, String authority, String prefFileName, boolean strictMode) {
         checkNotNull("context", context);
+        checkNotNull("handler", handler);
+        checkNotNull("authority", authority);
         checkNotNull("prefFileName", prefFileName);
         mContext = context;
-        mHandler = new Handler(context.getMainLooper());
+        mHandler = handler;
         mBaseUri = Uri.parse("content://" + authority).buildUpon().appendPath(prefFileName).build();
-        mListeners = new WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver>();
         mStrictMode = strictMode;
+        mListeners = new WeakHashMap<OnSharedPreferenceChangeListener, PreferenceContentObserver>();
+        mUriParser = new RemotePreferenceUriParser(authority);
     }
 
     @Override
@@ -485,7 +505,7 @@ public class RemotePreferences implements SharedPreferences {
 
         @Override
         public void onChange(boolean selfChange, Uri uri) {
-            String prefKey = uri.getLastPathSegment();
+            RemotePreferencePath path = mUriParser.parse(uri);
 
             // We use a weak reference to mimic the behavior of SharedPreferences.
             // The code which registered the listener is responsible for holding a
@@ -495,7 +515,7 @@ public class RemotePreferences implements SharedPreferences {
             if (listener == null) {
                 mContext.getContentResolver().unregisterContentObserver(this);
             } else {
-                listener.onSharedPreferenceChanged(RemotePreferences.this, prefKey);
+                listener.onSharedPreferenceChanged(RemotePreferences.this, path.key);
             }
         }
     }
