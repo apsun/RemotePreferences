@@ -287,10 +287,7 @@ public class RemotePreferencesTest {
     public void testUnwritablePrefStrictMode() {
         RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
-            remotePrefs
-                .edit()
-                .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
-                .apply();
+            remotePrefs.edit().putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar").commit();
             Assert.fail();
         } catch (RemotePreferenceAccessException e) {
             // Expected
@@ -309,6 +306,37 @@ public class RemotePreferencesTest {
     }
 
     @Test
+    public void testRemoveUnwritablePrefStrictMode() {
+        getSharedPreferences()
+            .edit()
+            .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(true);
+        try {
+            remotePrefs.edit().remove(TestConstants.UNWRITABLE_PREF_KEY).commit();
+            Assert.fail();
+        } catch (RemotePreferenceAccessException e) {
+            // Expected
+        }
+
+        Assert.assertEquals("foobar", remotePrefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
+    }
+
+    @Test
+    public void testRemoveUnwritablePrefNonStrictMode() {
+        getSharedPreferences()
+            .edit()
+            .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
+            .apply();
+
+        RemotePreferences remotePrefs = getRemotePreferences(false);
+        Assert.assertFalse(remotePrefs.edit().remove(TestConstants.UNWRITABLE_PREF_KEY).commit());
+
+        Assert.assertEquals("foobar", remotePrefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
+    }
+
+    @Test
     public void testRemovePref() {
         getSharedPreferences()
             .edit()
@@ -316,7 +344,7 @@ public class RemotePreferencesTest {
             .putInt("int", 0xeceb3026)
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         remotePrefs.edit().remove("string").apply();
 
         Assert.assertEquals("default", remotePrefs.getString("string", "default"));
@@ -331,24 +359,11 @@ public class RemotePreferencesTest {
             .putInt("int", 0xeceb3026)
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         remotePrefs.edit().clear().apply();
 
         Assert.assertEquals("default", remotePrefs.getString("string", "default"));
         Assert.assertEquals(0, remotePrefs.getInt("int", 0));
-    }
-
-    @Test
-    public void testRemoveUnwritablePref() {
-        getSharedPreferences()
-            .edit()
-            .putString(TestConstants.UNWRITABLE_PREF_KEY, "foobar")
-            .apply();
-
-        RemotePreferences remotePrefs = getRemotePreferences(false);
-        Assert.assertFalse(remotePrefs.edit().remove(TestConstants.UNWRITABLE_PREF_KEY).commit());
-
-        Assert.assertEquals("foobar", remotePrefs.getString(TestConstants.UNWRITABLE_PREF_KEY, "default"));
     }
 
     @Test
@@ -358,7 +373,7 @@ public class RemotePreferencesTest {
             .putString("pref", "foo;bar;")
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
             remotePrefs.getStringSet("pref", null);
             Assert.fail();
@@ -378,7 +393,7 @@ public class RemotePreferencesTest {
             .putStringSet("pref", set)
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
             remotePrefs.getString("pref", null);
             Assert.fail();
@@ -394,7 +409,7 @@ public class RemotePreferencesTest {
             .putBoolean("pref", true)
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
             remotePrefs.getInt("pref", 0);
             Assert.fail();
@@ -410,7 +425,7 @@ public class RemotePreferencesTest {
             .putInt("pref", 42)
             .apply();
 
-        RemotePreferences remotePrefs = getRemotePreferences(false);
+        RemotePreferences remotePrefs = getRemotePreferences(true);
         try {
             remotePrefs.getBoolean("pref", false);
             Assert.fail();
