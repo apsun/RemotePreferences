@@ -7,7 +7,9 @@ import java.util.Set;
  * Common utilities used to serialize and deserialize
  * preferences between the preference provider and caller.
  */
-/* package */ class RemoteUtils {
+/* package */ final class RemoteUtils {
+    private RemoteUtils() {}
+
     /**
      * Casts the parameter to a string set. Useful to avoid the unchecked
      * warning that would normally come with the cast. The value must

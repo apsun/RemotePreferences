@@ -3,7 +3,7 @@ package com.crossbowffs.remotepreferences;
 /**
  * Constants used for communicating with the preference provider.
  */
-/* package */ class RemoteContract {
+/* package */ final class RemoteContract {
     public static final String COLUMN_KEY = "key";
     public static final String COLUMN_TYPE = "type";
     public static final String COLUMN_VALUE = "value";
@@ -20,4 +20,6 @@ package com.crossbowffs.remotepreferences;
     public static final int TYPE_LONG = 4;
     public static final int TYPE_FLOAT = 5;
     public static final int TYPE_BOOLEAN = 6;
+
+    private RemoteContract() {}
 }

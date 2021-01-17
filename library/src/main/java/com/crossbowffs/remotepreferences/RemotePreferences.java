@@ -79,7 +79,7 @@ public class RemotePreferences implements SharedPreferences {
      * @param prefFileName The name of the preference file to access.
      * @param strictMode Whether strict mode is enabled.
      */
-    RemotePreferences(Context context, Handler handler, String authority, String prefFileName, boolean strictMode) {
+    /* package */ RemotePreferences(Context context, Handler handler, String authority, String prefFileName, boolean strictMode) {
         checkNotNull("context", context);
         checkNotNull("handler", handler);
         checkNotNull("authority", authority);
