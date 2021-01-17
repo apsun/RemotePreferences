@@ -432,78 +432,84 @@ public class RemotePreferencesTest {
     @Test
     public void testPreferenceChangeListener() {
         HandlerThread ht = new HandlerThread(getClass().getName());
-        ht.start();
-        Handler handler = new Handler(ht.getLooper());
-
-        RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
-        TestPreferenceListener listener = new TestPreferenceListener();
-
         try {
-            remotePrefs.registerOnSharedPreferenceChangeListener(listener);
+            ht.start();
+            Handler handler = new Handler(ht.getLooper());
 
-            getSharedPreferences()
-                .edit()
-                .putInt("foobar", 1337)
-                .apply();
+            RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
+            TestPreferenceListener listener = new TestPreferenceListener();
 
-            Assert.assertTrue(listener.waitForChange(1));
-            Assert.assertEquals("foobar", listener.getKey());
+            try {
+                remotePrefs.registerOnSharedPreferenceChangeListener(listener);
+
+                getSharedPreferences()
+                    .edit()
+                    .putInt("foobar", 1337)
+                    .apply();
+
+                Assert.assertTrue(listener.waitForChange(1));
+                Assert.assertEquals("foobar", listener.getKey());
+            } finally {
+                remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            }
         } finally {
-            remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            ht.quit();
         }
-
-        ht.quit();
     }
 
     @Test
     public void testPreferenceChangeListenerClear() {
         HandlerThread ht = new HandlerThread(getClass().getName());
-        ht.start();
-        Handler handler = new Handler(ht.getLooper());
-
-        RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
-        TestPreferenceListener listener = new TestPreferenceListener();
-
         try {
-            remotePrefs.registerOnSharedPreferenceChangeListener(listener);
+            ht.start();
+            Handler handler = new Handler(ht.getLooper());
 
-            getSharedPreferences()
-                .edit()
-                .clear()
-                .apply();
+            RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
+            TestPreferenceListener listener = new TestPreferenceListener();
 
-            Assert.assertTrue(listener.waitForChange(1));
-            Assert.assertNull(listener.getKey());
+            try {
+                remotePrefs.registerOnSharedPreferenceChangeListener(listener);
+
+                getSharedPreferences()
+                    .edit()
+                    .clear()
+                    .apply();
+
+                Assert.assertTrue(listener.waitForChange(1));
+                Assert.assertNull(listener.getKey());
+            } finally {
+                remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            }
         } finally {
-            remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            ht.quit();
         }
-
-        ht.quit();
     }
 
     @Test
     public void testUnregisterPreferenceChangeListener() {
         HandlerThread ht = new HandlerThread(getClass().getName());
-        ht.start();
-        Handler handler = new Handler(ht.getLooper());
-
-        RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
-        TestPreferenceListener listener = new TestPreferenceListener();
-
         try {
-            remotePrefs.registerOnSharedPreferenceChangeListener(listener);
-            remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            ht.start();
+            Handler handler = new Handler(ht.getLooper());
 
-            getSharedPreferences()
-                .edit()
-                .putInt("foobar", 1337)
-                .apply();
+            RemotePreferences remotePrefs = getRemotePreferencesWithHandler(handler, true);
+            TestPreferenceListener listener = new TestPreferenceListener();
 
-            Assert.assertFalse(listener.waitForChange(1));
+            try {
+                remotePrefs.registerOnSharedPreferenceChangeListener(listener);
+                remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+
+                getSharedPreferences()
+                    .edit()
+                    .putInt("foobar", 1337)
+                    .apply();
+
+                Assert.assertFalse(listener.waitForChange(1));
+            } finally {
+                remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            }
         } finally {
-            remotePrefs.unregisterOnSharedPreferenceChangeListener(listener);
+            ht.quit();
         }
-
-        ht.quit();
     }
 }
