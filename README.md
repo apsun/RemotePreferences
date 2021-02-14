@@ -9,11 +9,11 @@ A drop-in solution for inter-app access to `SharedPreferences`.
 
 ```
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    implementation 'com.crossbowffs.remotepreferences:remotepreferences:0.7'
+    implementation 'com.crossbowffs.remotepreferences:remotepreferences:0.8'
 }
 ```
 
@@ -200,6 +200,7 @@ implemented using `ContentObserver`.
 This solution does **not** use `MODE_WORLD_WRITEABLE` (which was
 deprecated in Android 4.2) or any other file permission hacks.
 
+
 ## Running tests
 
 Connect your Android device and run:
@@ -207,12 +208,17 @@ Connect your Android device and run:
 gradle :testapp:connectedAndroidTest
 ```
 
+
 ## License
 
 Distributed under the [MIT License](http://opensource.org/licenses/MIT).
 
 
 ## Changelog
+
+0.8
+- RemotePreferences is now hosted on `mavenCentral()`
+- Fixed `onSharedPreferenceChanged` getting the wrong `key` when calling `clear()`
 
 0.7
 - Added support for preferences located in device protected storage (thanks to Rijul-A)
