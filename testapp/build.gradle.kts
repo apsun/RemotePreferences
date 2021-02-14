@@ -17,7 +17,7 @@ android {
 dependencies {
     implementation(project(":library"))
 
-    androidTestImplementation("junit:junit:4.12")
+    androidTestImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core:1.3.0")
     androidTestImplementation("androidx.test:runner:1.3.0")
     androidTestImplementation("androidx.test:rules:1.3.0")
