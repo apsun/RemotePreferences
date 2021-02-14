@@ -69,7 +69,6 @@ import java.util.Set;
      * @param expectedType The expected type of the deserialized object.
      * @return The deserialized object.
      */
-    @SuppressWarnings("RedundantCast")
     public static Object deserializeInput(Object value, int expectedType) {
         if (expectedType == RemoteContract.TYPE_NULL) {
             if (value != null) {
@@ -170,7 +169,7 @@ import java.util.Set;
                 sb.append(next);
             } else if (c == ';') {
                 stringSet.add(sb.toString());
-                sb.setLength(0);
+                sb.delete(0, sb.length());
             } else {
                 sb.append(c);
             }

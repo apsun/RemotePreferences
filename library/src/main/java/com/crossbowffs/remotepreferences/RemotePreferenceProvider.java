@@ -355,7 +355,6 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
      * @param prefKey The preference key to modify, or {@code null} for the entire file.
      * @param values The values to write.
      */
-    @SuppressWarnings("ConstantConditions")
     private void putPreference(SharedPreferences.Editor editor, String prefKey, ContentValues values) {
         // Get the new value type. Note that we manually check
         // for null, then unbox the Integer so we don't cause a NPE.
