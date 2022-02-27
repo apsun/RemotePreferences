@@ -40,7 +40,7 @@ publishing {
 
                 groupId = "com.crossbowffs.remotepreferences"
                 artifactId = "remotepreferences"
-                version = android.defaultConfig.versionName
+                version = "0.8"
 
                 pom {
                     packaging = "aar"
