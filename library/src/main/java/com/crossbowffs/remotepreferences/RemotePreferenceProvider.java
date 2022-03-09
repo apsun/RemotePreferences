@@ -143,11 +143,23 @@ public abstract class RemotePreferenceProvider extends ContentProvider implement
             if (file.isDeviceProtected() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 context = context.createDeviceProtectedStorageContext();
             }
-            SharedPreferences prefs = context.getSharedPreferences(file.getFileName(), Context.MODE_PRIVATE);
+            SharedPreferences prefs = getSharedPreferences(context, file.getFileName());
             prefs.registerOnSharedPreferenceChangeListener(this);
             mPreferences.put(file.getFileName(), prefs);
         }
         return true;
+    }
+
+    /**
+     * Generate {@link SharedPreferences} to store the key-value data.
+     * Override this method to provide a custom implementation of {@link SharedPreferences}.
+     *
+     * @param context The context that should be used to get the preferences object.
+     * @param prefFileName The name of the preference file.
+     * @return An object implementing the {@link SharedPreferences} interface.
+     */
+    protected SharedPreferences getSharedPreferences(Context context, String prefFileName) {
+        return context.getSharedPreferences(prefFileName, Context.MODE_PRIVATE);
     }
 
     /**
