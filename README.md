@@ -5,7 +5,7 @@ A drop-in solution for inter-app access to `SharedPreferences`.
 
 ## Installation
 
-1\. Add the dependency to your `build.gradle` file:
+Add the dependency to your `build.gradle` file:
 
 ```
 repositories {
@@ -17,7 +17,10 @@ dependencies {
 }
 ```
 
-2\. Subclass `RemotePreferenceProvider` and implement a 0-argument
+
+## RemotePreferences using Content Providers
+
+1\. Subclass `RemotePreferenceProvider` and implement a 0-argument
 constructor which calls the super constructor with an authority
 (e.g. `"com.example.app.preferences"`) and an array of
 preference files to expose:
@@ -30,7 +33,7 @@ public class MyPreferenceProvider extends RemotePreferenceProvider {
 }
 ```
 
-3\. Add the corresponding entry to `AndroidManifest.xml`, with
+2\. Add the corresponding entry to `AndroidManifest.xml`, with
 `android:authorities` equal to the authority you picked in the
 last step, and `android:exported` set to `true`:
 
@@ -41,7 +44,7 @@ last step, and `android:exported` set to `true`:
     android:exported="true"/>
 ```
 
-4\. You're all set! To access your preferences, create a new
+3\. You're all set! To access your preferences, create a new
 instance of `RemotePreferences` with the same authority and the
 name of the preference file:
 
@@ -60,6 +63,61 @@ if your code is executing within the app that owns the preferences. Only use
 `RemotePreferences` when accessing preferences from the context of another app.
 
 Also note that your preference keys cannot be `null` or `""` (empty string).
+
+On Android 11 and above the receiving app must specify the contents it reads
+in it's `AndroidManifest.xml`.
+
+
+## IntentBridgedPreferences using Intents
+
+1\. Subclass `IntentBridgedPreferencesRequestedReceiver` and implement
+a 0-argument constructor which calls the super constructor with an action
+(e.g. "com.example.app.preferences") and the `SharedPreferences` instance to
+expose:
+
+```Java
+public class MyPreferencesRequestedReceiver extends IntenBridgedPreferencesRequestedReceiver {
+    public MyPreferencesRequestedReceiver() {
+        super("com.example.app.preferences", PreferenceManager.getDefaultSharedPreferences(AndroidAppHelper.currentApplication()));
+    }
+}
+```
+
+2\. Add the corresponding entry to `AndroidManifest.xml`, with
+`action` equal to the action you picked in the last step:
+
+```XML
+<receiver
+    android:name=".MyPreferencesRequestedReceiver"
+    android:enabled="true"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.example.app.preferences.PREFERENCES_REQUESTED"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+    </intent-filter>
+</receiver>
+```
+
+3\. If you want changes to propagate immediately, you need to register
+an `IntentBridgedPreferenceSender` on the preferences you want to send:
+
+```java
+IntentBridgedPreferenceSender preferenceSender = new IntentBridgedPreferenceSender(
+    getContext(),
+    "com.example.app.preferences",
+    getPreferenceManager().getSharedPreferences());
+```
+
+Don't forget to hold onto the created instance (e.g. as a member of
+the activity), as the preference listeners are all weak instances.
+
+4\. You're all set! To access your preferences, create a new
+instance of `IntentBridgedPreferences` with the same authority:
+
+```Java
+SharedPreferences prefs = new IntentBridgedPreferences(context, "com.example.app.preferences");
+int value = prefs.getInt("my_int_pref", 0);
+```
 
 
 ## Security
