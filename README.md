@@ -205,7 +205,7 @@ deprecated in Android 4.2) or any other file permission hacks.
 
 Connect your Android device and run:
 ```
-gradle :testapp:connectedAndroidTest
+./gradlew :testapp:connectedAndroidTest
 ```
 
 
