@@ -2,10 +2,12 @@ package com.crossbowffs.remotepreferences;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.crossbowffs.remotepreferences.testapp.TestConstants;
@@ -458,6 +460,7 @@ public class RemotePreferencesTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.R)
     public void testPreferenceChangeListenerClear() {
         HandlerThread ht = new HandlerThread(getClass().getName());
         try {
