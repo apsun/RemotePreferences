@@ -5,28 +5,19 @@ plugins {
 }
 
 android {
-    compileSdk = 33
+    namespace = "com.crossbowffs.remotepreferences"
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 1
-        targetSdk = 33
     }
-}
 
-val sourcesJar = tasks.register("sourcesJar", Jar::class) {
-    from(android.sourceSets["main"].java.getSourceFiles())
-    archiveClassifier.set("sources")
-}
-
-val javadoc = tasks.register("javadoc", Javadoc::class) {
-    source = android.sourceSets["main"].java.getSourceFiles()
-    classpath += project.files(android.bootClasspath)
-}
-
-val javadocJar = tasks.register("javadocJar", Jar::class) {
-    dependsOn(javadoc)
-    from(javadoc)
-    archiveClassifier.set("javadoc")
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
 }
 
 publishing {
@@ -34,9 +25,6 @@ publishing {
         afterEvaluate {
             create<MavenPublication>("release") {
                 from(components["release"])
-
-                artifact(sourcesJar)
-                artifact(javadocJar)
 
                 groupId = "com.crossbowffs.remotepreferences"
                 artifactId = "remotepreferences"

@@ -3,11 +3,12 @@ plugins {
 }
 
 android {
-    compileSdk = 33
+    namespace = "com.crossbowffs.remotepreferences.testapp"
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 14
-        targetSdk = 33
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
